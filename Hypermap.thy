@@ -14,9 +14,9 @@ locale hypermap =
   fixes H :: "'a hypermap" (structure)
   assumes edgeK: "edge H (node H (face H x)) = x"
   and finite_darts: "finite (darts H)"
-  and permutes_edge: "set_perm (edge H) \<subseteq> darts H"
-  and permutes_node: "set_perm (node H) \<subseteq> darts H"
-  and permutes_face: "set_perm (face H) \<subseteq> darts H"
+  and darts_edge: "set_perm (edge H) \<subseteq> darts H"
+  and darts_node: "set_perm (node H) \<subseteq> darts H"
+  and darts_face: "set_perm (face H) \<subseteq> darts H"
 begin
 
 text \<open>Basic properties of the functions\<close>
@@ -26,15 +26,33 @@ lemma nodeK: "\<And>x. node H (face H (edge H x)) = x"
 lemma faceK: "\<And>x. face H (edge H (node H x)) = x"
   by (meson apply_inj_eq_iff nodeK)
 
+lemma perm_edge: "(edge H) permutes (darts H)"
+  by (meson bij_betw_apply_perm bij_imp_permutes darts_edge in_mono in_set_permI)
+
+lemma perm_node: "(node H) permutes (darts H)"
+  by (meson bij_betw_apply_perm bij_imp_permutes darts_node in_mono in_set_permI)
+
+lemma perm_face: "(face H) permutes (darts H)"
+  by (meson bij_betw_apply_perm bij_imp_permutes darts_face in_mono in_set_permI)
+
 text \<open>Cycles\<close>
 definition cedge where
  "cedge h \<equiv> (Gr (darts h) (edge h))\<^sup>+"
 
+lemma cedge_sym: "sym (cedge H)"
+  by (simp add: perm_trancl_sym cedge_def perm_edge)
+
 definition cnode where
  "cnode h \<equiv> (Gr (darts h) (node h))\<^sup>+"
 
+lemma cnode_sym: "sym (cnode H)"
+  by (simp add: perm_trancl_sym cnode_def perm_node)
+
 definition cface where
   "cface h \<equiv> (Gr (darts h) (face h))\<^sup>+"
+
+lemma cface_sym: "sym (cface H)"
+  by (simp add: perm_trancl_sym cface_def perm_face)
 
 section \<open>Components\<close>
 
@@ -48,6 +66,16 @@ definition glink :: "'a hypermap \<Rightarrow> 'a rel"
   where "glink h = (Gr (darts h) (edge h)) \<union>
                    (Gr (darts h) (node h)) \<union>
                    (Gr (darts h) (face h))"
+
+lemma glink_sym: "sym ((glink H)\<^sup>+)"
+proof -
+  have "sym ((glink H)\<^sup>*)"
+    by (smt (verit, ccfv_threshold) cface_sym cnode_sym cedge_sym sym_rtrancl glink_def
+          hypermap_axioms perm_edge perm_face perm_node perm_trancl_sym rtrancl_Un_rtrancl
+          sym_Un trancl_rtrancl_absorb)
+  then show "sym ((glink H)\<^sup>+)"
+    by (metis rtranclD sym_def trancl_into_rtrancl)
+qed
 
 definition connected_hypermap :: "'a hypermap \<Rightarrow> bool" where
 "connected_hypermap h \<equiv> connected (rel_to_digraph (glink h))"
@@ -85,34 +113,36 @@ lemma clinkF: "x \<in> darts H \<Longrightarrow> (x, (face H x)) \<in> clink H"
   by (simp add: Gr_eq clink_def)
 
 lemma clinkC: "sym ((clink H)\<^sup>+)"
-  unfolding clink_def sorry
+  unfolding clink_def by (smt (verit, ccfv_threshold) cface_def cface_sym cnode_def
+      cnode_sym converse_Un rtranclD rtrancl_Un_rtrancl rtrancl_converse sym_conv_converse_eq
+      sym_def trancl_into_rtrancl trancl_rtrancl_absorb)
   
 lemma clink_glink: "(clink H)\<^sup>+ = (glink H)\<^sup>+"
-proof (rule subset_antisym)
-    have "\<forall>x y. x \<subseteq> ((x\<inverse> \<union> y)\<inverse>)\<^sup>+" by auto
-    then show "(clink H)\<^sup>+ \<subseteq> (glink H)\<^sup>+"
-      try
+proof
+  show "(clink H)\<^sup>+ \<subseteq> (glink H)\<^sup>+" sorry
+    (*have "\<forall>x y. x \<subseteq> ((x\<inverse> \<union> y)\<inverse>)\<^sup>+" by auto
+    then show "(clink H)\<^sup>+ \<subseteq> (glink H)\<^sup>+" try*)
   next
-    have "glink H \<subseteq> (clink H)\<^sup>*"
+    have "glink H \<subseteq> (clink H)\<^sup>+"
     proof
       fix z assume "z \<in> glink H"
       then obtain x y where "(x,y) = z" by (metis surj_pair)
       then have "y = edge H x \<or> y = node H x \<or> y = face H x"
-        by (metis Un_iff \<open>z \<in> glink H\<close> glink_def rel_of_eq)
-      also have "y = edge H x \<Longrightarrow> (x,y) \<in> (clink H)\<^sup>*"
-        sorry
-      moreover have "y = node H x \<Longrightarrow> (x,y) \<in> (clink H)\<^sup>*"
-        by (simp add: clinkC clinkN r_into_rtrancl symD)
-      moreover have "y = face H x \<Longrightarrow> (x,y) \<in> (clink H)\<^sup>*"
-        using clinkP by blast
-      ultimately show "z \<in> (clink H)\<^sup>*" using \<open>(x,y) = z\<close> by blast
+        by (metis Gr_eq UnE \<open>z \<in> glink H\<close> glink_def)
+      also have "y = edge H x \<Longrightarrow> (x,y) \<in> (clink H)\<^sup>+"
+        by (smt (z3) Gr_eq Un_iff \<open>(x, y) = z\<close> \<open>z \<in> glink H\<close> clinkC clinkN hypermap.clinkF hypermap.glink_def hypermap_axioms nodeK perm_face perm_node permutes_in_image sym_def trancl.r_into_trancl trancl_trans)
+      moreover have "y = node H x \<Longrightarrow> (x,y) \<in> (clink H)\<^sup>+"
+        by (metis calculation(2) clinkC clinkN darts_edge darts_node in_mono in_set_permI symE trancl.simps)
+      moreover have "y = face H x \<Longrightarrow> (x,y) \<in> (clink H)\<^sup>+"
+        by (metis calculation(2) clinkF darts_edge darts_node faceK in_mono in_set_permI trancl.r_into_trancl)
+      ultimately show "z \<in> (clink H)\<^sup>+" using \<open>(x,y) = z\<close> by blast
     qed
-    then show "(glink H)\<^sup>* \<subseteq> (clink H)\<^sup>*"
-      by (rule rtrancl_subset_rtrancl)
-  qed
+    then show "(glink H)\<^sup>+ \<subseteq> (clink H)\<^sup>+"
+      by (smt (verit) IntE relcompE subsetD subsetI trancl_Int_subset transitive_closure_trans(2))
+ qed
 
 lemma connected_clink:
-  assumes "connected_hypermap H"
+  assumes "connected_hypermap H" "x \<in> (darts H)"
   shows "\<exists> p. (awalk (clink H) x p y)"
   sorry
 
@@ -122,7 +152,7 @@ definition appears_before :: "'a list \<Rightarrow> 'a \<Rightarrow> 'a \<Righta
 fun moebius_path :: "'a hypermap \<Rightarrow> 'a vwalk \<Rightarrow> bool" where
   "moebius_path _ [] = False"
 | "moebius_path h p = (vpath p (rel_to_digraph (clink h)) \<and>
-            (\<exists>n. ((n, (last p)) \<in> (rel_of (node h))) \<and> appears_before p n (node h (hd p))))"
+            (\<exists>n. ((n, (last p)) \<in> (Gr (darts h) (node h))) \<and> appears_before p n (node h (hd p))))"
 
 definition jordan :: "'a hypermap \<Rightarrow> bool" where
 "jordan h = (\<forall>p. \<not> (moebius_path h p))"
