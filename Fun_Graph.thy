@@ -26,7 +26,7 @@ qed
 lemma set_perm_subset:
   assumes "(p :: 'a perm) permutes S"
   shows "set_perm p \<subseteq> S"
-  by (meson Permutations.permutes_not_in apply_perm_neq_idI assms subsetI)
+  by (meson permutes_not_in apply_perm_neq_idI assms subsetI)
 
 text \<open>Graph of a function on a domain, and lemmas about its transitive closure\<close>
 
@@ -54,7 +54,8 @@ proof -
   then have "\<exists>n\<in>{0<..card S}. (p ^^ n) x = x" by (metis inj_funpow_cycle_exists assms(1,3))
   then obtain n where "n > 0 \<and> (p ^^ n) x = x" by auto
   then show ?thesis
-    by (metis funpow_in_trancl assms(1) assms(2) gr0_implies_Suc permutes_in_image)
+    by (metis funpow_in_tranc
+lemma connected_clink:l assms(1) assms(2) gr0_implies_Suc permutes_in_image)
 qed
 
 corollary perm_trancl_eq_rtrancl:
@@ -109,11 +110,20 @@ qed
 lemma perm_trancl_sym:
   assumes "(p :: 'a perm) permutes S"
   shows "sym ((Gr S p)\<^sup>+)"
-proof
-  assume 1: "(x,y) \<in> (Gr S p)\<^sup>+"
-  then obtain n where "n > 0 \<and> (p ^^ n) x = y"
-   sorry(*using Gr_eq assms converse_tranclE permutation_rel_funpow sledgehammer*)
-  also assume "x \<noteq> y"
-  ultimately have "y \<in> set_cycle (perm_orbit p x)" using assms funpow_apply_cycle_perm_orbit
+  by (metis assms funpow_cycles perm_trancl_eq_cycles permutation_rel_funpow symI)
+
+corollary perm_rtrancl_sym:
+  assumes "(p :: 'a perm) permutes S"
+  shows "sym ((Gr S p)\<^sup>*)"
+  by (metis assms perm_trancl_sym rtrancl_trancl_reflcl sym_Id sym_Un)
+
+
+section \<open>Graphs on relations\<close>
+
+definition rel_to_digraph :: "'a rel \<Rightarrow> 'a pair_pre_digraph" where
+"rel_to_digraph r = \<lparr>pverts = Field r, parcs = r\<rparr>"
+
+interpretation pair_wf_digraph "rel_to_digraph r"
+  by (simp add: FieldI1 FieldI2 pair_wf_digraph_def rel_to_digraph_def)
 
 end

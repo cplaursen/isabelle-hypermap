@@ -55,30 +55,20 @@ lemma cface_sym: "sym (cface H)"
   by (simp add: perm_trancl_sym cface_def perm_face)
 
 section \<open>Components\<close>
-
-definition rel_to_digraph :: "'a rel \<Rightarrow> 'a pair_pre_digraph" where
-"rel_to_digraph r = \<lparr>pverts = Field r, parcs = r\<rparr>"
-
-interpretation pair_wf_digraph "rel_to_digraph r"
-  by (simp add: FieldI1 FieldI2 pair_wf_digraph_def rel_to_digraph_def)
-
 definition glink :: "'a hypermap \<Rightarrow> 'a rel"
   where "glink h = (Gr (darts h) (edge h)) \<union>
                    (Gr (darts h) (node h)) \<union>
                    (Gr (darts h) (face h))"
 
-lemma glink_sym: "sym ((glink H)\<^sup>+)"
-proof -
-  have "sym ((glink H)\<^sup>*)"
-    by (smt (verit, ccfv_threshold) cface_sym cnode_sym cedge_sym sym_rtrancl glink_def
-          hypermap_axioms perm_edge perm_face perm_node perm_trancl_sym rtrancl_Un_rtrancl
-          sym_Un trancl_rtrancl_absorb)
-  then show "sym ((glink H)\<^sup>+)"
-    by (metis rtranclD sym_def trancl_into_rtrancl)
-qed
+lemma glink_rtrancl_sym: "sym ((glink H)\<^sup>*)"
+  by (smt (verit, ccfv_threshold) cface_sym cnode_sym cedge_sym sym_rtrancl glink_def hypermap_axioms
+      perm_edge perm_face perm_node perm_trancl_sym rtrancl_Un_rtrancl sym_Un trancl_rtrancl_absorb)
+
+corollary glink_trancl_sym: "sym ((glink H)\<^sup>+)"
+    by (metis rtranclD sym_def trancl_into_rtrancl glink_rtrancl_sym)
 
 definition connected_hypermap :: "'a hypermap \<Rightarrow> bool" where
-"connected_hypermap h \<equiv> connected (rel_to_digraph (glink h))"
+"connected_hypermap h \<equiv> strongly_connected (rel_to_digraph (glink h))"
 
 text \<open>All connected components are in the same equivalence class\<close>
 section \<open>Genus\<close>
@@ -112,39 +102,42 @@ lemma clinkN: "x \<in> darts H \<Longrightarrow> ((node H x), x) \<in> clink H"
 lemma clinkF: "x \<in> darts H \<Longrightarrow> (x, (face H x)) \<in> clink H"
   by (simp add: Gr_eq clink_def)
 
-lemma clinkC: "sym ((clink H)\<^sup>+)"
-  unfolding clink_def by (smt (verit, ccfv_threshold) cface_def cface_sym cnode_def
-      cnode_sym converse_Un rtranclD rtrancl_Un_rtrancl rtrancl_converse sym_conv_converse_eq
-      sym_def trancl_into_rtrancl trancl_rtrancl_absorb)
+lemma clink_rtrancl_sym: "sym ((clink H)\<^sup>*)"
+  by (smt (verit, ccfv_threshold) clink_def converse_Un perm_face perm_node perm_rtrancl_sym
+           rtrancl_Un_rtrancl rtrancl_converse sym_conv_converse_eq trancl_converse)
+
+corollary clink_trancl_sym: "sym ((clink H)\<^sup>+)"
+  by (metis clink_rtrancl_sym rtranclD sym_def trancl_into_rtrancl)
   
-lemma clink_glink: "(clink H)\<^sup>+ = (glink H)\<^sup>+"
+lemma clink_glink: "(clink H)\<^sup>* = (glink H)\<^sup>*"
 proof
-  show "(clink H)\<^sup>+ \<subseteq> (glink H)\<^sup>+" sorry
-    (*have "\<forall>x y. x \<subseteq> ((x\<inverse> \<union> y)\<inverse>)\<^sup>+" by auto
-    then show "(clink H)\<^sup>+ \<subseteq> (glink H)\<^sup>+" try*)
+  show "(clink H)\<^sup>* \<subseteq> (glink H)\<^sup>*"
+      by (smt (z3) Un_subset_iff clink_def converse_subset_swap glink_def glink_rtrancl_sym
+          rtrancl_subset_rtrancl rtrancl_trancl_reflcl sup.cobounded1 sym_conv_converse_eq trancl_unfold)
   next
-    have "glink H \<subseteq> (clink H)\<^sup>+"
+    have "glink H \<subseteq> (clink H)\<^sup>*"
     proof
       fix z assume "z \<in> glink H"
       then obtain x y where "(x,y) = z" by (metis surj_pair)
       then have "y = edge H x \<or> y = node H x \<or> y = face H x"
         by (metis Gr_eq UnE \<open>z \<in> glink H\<close> glink_def)
-      also have "y = edge H x \<Longrightarrow> (x,y) \<in> (clink H)\<^sup>+"
-        by (smt (z3) Gr_eq Un_iff \<open>(x, y) = z\<close> \<open>z \<in> glink H\<close> clinkC clinkN hypermap.clinkF hypermap.glink_def hypermap_axioms nodeK perm_face perm_node permutes_in_image sym_def trancl.r_into_trancl trancl_trans)
-      moreover have "y = node H x \<Longrightarrow> (x,y) \<in> (clink H)\<^sup>+"
-        by (metis calculation(2) clinkC clinkN darts_edge darts_node in_mono in_set_permI symE trancl.simps)
-      moreover have "y = face H x \<Longrightarrow> (x,y) \<in> (clink H)\<^sup>+"
-        by (metis calculation(2) clinkF darts_edge darts_node faceK in_mono in_set_permI trancl.r_into_trancl)
-      ultimately show "z \<in> (clink H)\<^sup>+" using \<open>(x,y) = z\<close> by blast
+      also have "y = edge H x \<Longrightarrow> (x,y) \<in> (clink H)\<^sup>*"
+        by (smt (verit, ccfv_SIG) clinkF clinkN clink_rtrancl_sym converse.intros darts_edge hypermap.nodeK hypermap_axioms in_mono in_set_permI perm_node permutes_in_image rtrancl.simps rtrancl_converse sym_conv_converse_eq)
+      moreover have "y = node H x \<Longrightarrow> (x,y) \<in> (clink H)\<^sup>*"
+        by (metis apply_perm_eq_same_iff(2) clinkN clink_rtrancl_sym darts_node r_into_rtrancl rtrancl_eq_or_trancl subset_iff sym_def)
+      moreover have "y = face H x \<Longrightarrow> (x,y) \<in> (clink H)\<^sup>*"
+        by (metis clinkF darts_edge darts_node faceK in_mono in_set_permI rtrancl.simps)
+      ultimately show "z \<in> (clink H)\<^sup>*" using \<open>(x,y) = z\<close> by blast
     qed
-    then show "(glink H)\<^sup>+ \<subseteq> (clink H)\<^sup>+"
-      by (smt (verit) IntE relcompE subsetD subsetI trancl_Int_subset transitive_closure_trans(2))
- qed
+    then show "(glink H)\<^sup>* \<subseteq> (clink H)\<^sup>*"
+      by (rule rtrancl_subset_rtrancl)
+qed
+
 
 lemma connected_clink:
-  assumes "connected_hypermap H" "x \<in> (darts H)"
-  shows "\<exists> p. (awalk (clink H) x p y)"
-  sorry
+  assumes "connected_hypermap H" "x \<in> (darts H)" "y \<in> (darts H)"
+  shows "x \<rightarrow>\<^sup>*\<^bsub>(rel_to_digraph (clink H))\<^esub> y"
+  using clink_glink assms connected_hypermap_def sorry
 
 definition appears_before :: "'a list \<Rightarrow> 'a \<Rightarrow> 'a \<Rightarrow> bool" where
 "appears_before p x y = (y \<in> set (dropWhile (\<lambda> z. z \<noteq> x) p))"
