@@ -1,7 +1,8 @@
 theory Fun_Graph
-  imports "Graph_Theory.Graph_Theory" "Perm"
+  imports "Perm" "Graph_Theory.Graph_Theory"
 begin
 
+text \<open>Permutations and funpow\<close>
 lemma cycles_funpow:
   assumes "z \<in> set_cycle (perm_orbit p x)"
   shows "\<exists>n. (apply_perm p ^^ n) z = x"
@@ -28,102 +29,93 @@ lemma set_perm_subset:
   shows "set_perm p \<subseteq> S"
   by (meson permutes_not_in apply_perm_neq_idI assms subsetI)
 
-text \<open>Graph of a function on a domain, and lemmas about its transitive closure\<close>
+text \<open>Digraph extras\<close>
+lemma reachable1:
+  assumes "a \<rightarrow>\<^bsub>G\<^esub> b" "a \<in> verts G" "b \<in> verts G"
+  shows "a\<rightarrow>\<^sup>*\<^bsub>G\<^esub>b"
+  by (metis assms reachable_def rtrancl_on.simps)
 
-definition "Gr A f = {(a, f a) | a. a \<in> A}"
+text \<open>Pair digraph of a function\<close>
 
-lemma Gr_eq: "(a,b) \<in> Gr A f \<longleftrightarrow> a \<in> A \<and> f a = b"
+definition Gr :: "'a set \<Rightarrow> ('a \<Rightarrow> 'a) \<Rightarrow> 'a pair_pre_digraph" where
+"Gr S f = \<lparr>pverts = S, parcs = {(a, f a) | a. a \<in> S}\<rparr>"
+
+lemma Gr_eq: "a\<rightarrow>\<^bsub>Gr S f\<^esub> b \<longleftrightarrow> a \<in> S \<and> f a = b"
   unfolding Gr_def by auto
 
-lemma funpow_in_trancl:
+lemma funpow_in_rtrancl:
   assumes "a \<in> S" "\<forall> x \<in> S. f x \<in> S"
-  shows "(a, (f ^^ (Suc n)) a) \<in> (Gr S f)\<^sup>+"
+  shows "a\<rightarrow>\<^sup>*\<^bsub>Gr S f\<^esub>(f ^^ n) a"
 proof (induct n)
+  let ?G = "Gr S f"
   case 0
-  then show ?case by (simp add: Gr_eq assms(1) r_into_trancl')
+  then show ?case using assms by (simp add: Fun_Graph.Gr_def reachable_def)
 next
   case (Suc n)
-  then show ?case by (smt (verit, best) Gr_eq assms(2) funpow_simp_l trancl.simps)
+  then show ?case
+    by (smt (verit, del_insts) assms Gr_eq Fun_Graph.Gr_def funpow_simp_l pair_pre_digraph.simps(1)
+        reachable_def rtrancl_on.simps with_proj_simps(1))
 qed
 
-lemma perm_trancl_refl:
-  assumes "x \<in> S" "p permutes S" "finite S"
-  shows "(x,x) \<in> ((Gr S p)\<^sup>+)"
-proof -
-  from assms(2) have "bij_betw p S S" by (rule permutes_imp_bij)
-  then have "\<exists>n\<in>{0<..card S}. (p ^^ n) x = x" by (metis inj_funpow_cycle_exists assms(1,3))
-  then obtain n where "n > 0 \<and> (p ^^ n) x = x" by auto
-  then show ?thesis
-    by (metis funpow_in_tranc
-lemma connected_clink:l assms(1) assms(2) gr0_implies_Suc permutes_in_image)
-qed
+locale perm_on =
+  fixes p :: "'a perm" and S :: "'a set"
+  assumes permutes_p: "p permutes S" and finite_S: "finite S"
+begin
 
-corollary perm_trancl_eq_rtrancl:
-  assumes "x \<in> S" "p permutes S" "finite S"
-  shows "(x,y) \<in> ((Gr S p)\<^sup>+) \<longleftrightarrow> (x,y) \<in> ((Gr S p)\<^sup>*)"
-  by (metis assms perm_trancl_refl rtrancl_eq_or_trancl)
+interpretation pair_wf_digraph "Gr S p"
+  by (simp add: Fun_Graph.Gr_def pair_wf_digraph_def permutes_p permutes_in_image)
 
-lemma Gr_trancl_imp_funpow: "(x,y) \<in> (Gr S p)\<^sup>+ \<longrightarrow> (\<exists>n>0. (p ^^ n) x = y)"
+lemma reach_iff_funpow:
+  assumes "a \<in> S"
+  shows "a\<rightarrow>\<^sup>*\<^bsub>Gr S p\<^esub>b \<longleftrightarrow> (\<exists>n. (((\<langle>$\<rangle>) p) ^^ n) a = b)" (is "?L \<longleftrightarrow> ?R")
 proof
-  assume "(x,y) \<in> (Gr S p)\<^sup>+"
-  then show "(\<exists>n>0. (p ^^ n) x = y)"
-  proof (induct rule: trancl_induct)
-    case (base y)
-    then have "p x = y" by (metis Gr_eq)
-    then show ?case by auto
+  assume ?L then show ?R
+  proof (induct rule: reachable_induct)
+    case base
+    then show ?case by (meson funpow_0)
   next
-    case (step y z)
-    then show ?case by (metis Gr_eq funpow_simp_l less_Suc_eq)
+    case (step x y)
+    then obtain n where "(((\<langle>$\<rangle>) p) ^^ n) a = x" by auto
+    also have "p x = y" by (metis Gr_eq step.hyps(2) with_proj_simps(3))
+    ultimately show ?case by (metis funpow_simp_l)
   qed
-qed
-
-lemma funpow_imp_Gr_trancl:
-  assumes "p permutes S" "x \<noteq> y" "(p ^^ n) x = y" "n > 0"
-  shows "(x,y) \<in> (Gr S p)\<^sup>+"
-  by (metis (no_types, lifting) Permutations.permutes_not_in id_funpow_id gr0_implies_Suc
-      permutes_in_image funpow_in_trancl assms)
-
-corollary permutation_rel_funpow:
-  assumes "p permutes S" "x \<noteq> y"
-  shows "(x,y) \<in> (Gr S p)\<^sup>+ \<longleftrightarrow> (\<exists>n>0. (p ^^ n) x = y)"
-  by (metis assms funpow_imp_Gr_trancl Gr_trancl_imp_funpow)
-
-lemma perm_trancl_eq_cycles:
-  assumes "x \<noteq> y" "(p :: 'a perm) permutes S"
-  shows "y \<in> set_cycle (perm_orbit p x) \<longleftrightarrow> (x,y) \<in> (Gr S p)\<^sup>+"
-proof
-  assume *: "y \<in> set_cycle (perm_orbit p x)"
-  then obtain n where "n > 0 \<and> (apply_perm p ^^ n) y = x"
-     by (metis cycles_funpow assms(1) funpow_0 gr0I)
-  then show "(x,y) \<in> (Gr S p)\<^sup>+"
-    by (smt (verit, del_insts) * assms funpow_in_trancl apply_perm_Perm Permutations.permutes_not_in
-        apply_perm_power funpow_0 funpow_apply_cycle_perm_orbit funpow_apply_perm_in_perm_orbit_iff 
-        nat_neq_iff not_less0 permutation_rel_funpow set_cycle_ex_funpow start_in_perm_orbit_iff)
 next
-  assume *: "(x,y) \<in> (Gr S p)\<^sup>+"
-  then obtain n where "n > 0 \<and> (apply_perm p ^^ n) y = x" using Gr_trancl_imp_funpow assms
-    by (metis cycles_funpow funpow_0 funpow_apply_perm_in_perm_orbit_iff gr0I id_funpow_id start_in_perm_orbit_iff)
-  then show "y \<in> set_cycle (perm_orbit p x)"
-    by (metis assms(1) funpow_cycles)
+  assume *: ?R
+  then obtain n where "((\<langle>$\<rangle>) p ^^ n) a = b" by auto
+  then show ?L using assms funpow_in_rtrancl
+    by (metis (no_types, lifting) Fun_Graph.Gr_def Gr_eq in_arcsD2 pair_pre_digraph.simps(1) with_proj_simps(3))
 qed
 
-lemma perm_trancl_sym:
-  assumes "(p :: 'a perm) permutes S"
-  shows "sym ((Gr S p)\<^sup>+)"
-  by (metis assms funpow_cycles perm_trancl_eq_cycles permutation_rel_funpow symI)
+lemma perm_cycles_iff_reach:
+  assumes "x \<noteq> y"
+  shows "y \<in> set_cycle (perm_orbit p x) \<longleftrightarrow> x\<rightarrow>\<^sup>*\<^bsub>Gr S p\<^esub>y" (is "?L \<longleftrightarrow> ?R")
+proof
+  assume *: ?L
+  then obtain n where "(apply_perm p ^^ n) y = x"
+     using cycles_funpow by fast
+   then show ?R
+     by (smt (verit, del_insts) * perm_on.permutes_p perm_on_axioms reach_iff_funpow Permutations.permutes_not_in
+        apply_perm_power funpow_apply_cycle_perm_orbit funpow_apply_perm_in_perm_orbit_iff 
+        set_cycle_ex_funpow start_in_perm_orbit_iff)
+next
+  assume *: ?R
+  then obtain n where "(apply_perm p ^^ n) x = y"
+    by (metis (no_types, lifting) Fun_Graph.Gr_def reach_iff_funpow pair_pre_digraph.simps(1) reachable_in_verts(1))
+  then show ?L
+    by (metis assms funpow_apply_perm_in_perm_orbit_iff id_funpow_id start_in_perm_orbit_iff)
+qed
 
-corollary perm_rtrancl_sym:
-  assumes "(p :: 'a perm) permutes S"
-  shows "sym ((Gr S p)\<^sup>*)"
-  by (metis assms perm_trancl_sym rtrancl_trancl_reflcl sym_Id sym_Un)
+lemma perm_reach_sym: "x\<rightarrow>\<^sup>*\<^bsub>Gr S p\<^esub>y \<Longrightarrow> y\<rightarrow>\<^sup>*\<^bsub>Gr S p\<^esub>x"
+proof (induct rule: reachable_induct)
+case base
+  then show ?case by simp
+next
+  let ?G = "Gr S p"
+  case (step x y)
+  then have "y \<rightarrow>\<^sup>*\<^bsub>?G\<^esub> x"
+    by (smt (verit, best) Fun_Graph.Gr_def adj_in_verts(2) apply_perm_power funpow_apply_cycle_perm_orbit funpow_apply_perm_in_perm_orbit_iff pair_pre_digraph.simps(1) perm_cycles_iff_reach reach_iff_funpow reachable_adjI reachable_in_verts(1) reachable_refl set_cycle_ex_funpow)
+  then show ?case by (meson reachable_trans step.hyps(3))
+qed
 
-
-section \<open>Graphs on relations\<close>
-
-definition rel_to_digraph :: "'a rel \<Rightarrow> 'a pair_pre_digraph" where
-"rel_to_digraph r = \<lparr>pverts = Field r, parcs = r\<rparr>"
-
-interpretation pair_wf_digraph "rel_to_digraph r"
-  by (simp add: FieldI1 FieldI2 pair_wf_digraph_def rel_to_digraph_def)
-
+end
 end

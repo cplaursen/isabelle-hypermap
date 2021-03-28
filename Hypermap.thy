@@ -1,5 +1,5 @@
 theory Hypermap
-  imports "Fun_Graph"
+  imports "Fun_Graph" (*"Rel_Digraph"*)
 begin
 
 section \<open>Hypermap\<close>
@@ -37,38 +37,32 @@ lemma perm_face: "(face H) permutes (darts H)"
 
 text \<open>Cycles\<close>
 definition cedge where
- "cedge h \<equiv> (Gr (darts h) (edge h))\<^sup>+"
+ "cedge h \<equiv> (Gr (darts h) (edge h))"
 
-lemma cedge_sym: "sym (cedge H)"
-  by (simp add: perm_trancl_sym cedge_def perm_edge)
+lemma cedge_reachable_sym: "u \<rightarrow>\<^sup>*\<^bsub>cedge H\<^esub>v \<Longrightarrow> v \<rightarrow>\<^sup>*\<^bsub>cedge H\<^esub> u "
+  by (metis cedge_def finite_darts perm_edge perm_on.intro perm_on.perm_reach_sym)
 
 definition cnode where
- "cnode h \<equiv> (Gr (darts h) (node h))\<^sup>+"
+ "cnode h \<equiv> (Gr (darts h) (node h))"
 
-lemma cnode_sym: "sym (cnode H)"
-  by (simp add: perm_trancl_sym cnode_def perm_node)
+lemma cnode_reachable_sym: "u \<rightarrow>\<^sup>*\<^bsub>cnode H\<^esub>v \<Longrightarrow> v \<rightarrow>\<^sup>*\<^bsub>cnode H\<^esub> u "
+  by (metis cnode_def finite_darts perm_node perm_on.intro perm_on.perm_reach_sym)
 
 definition cface where
-  "cface h \<equiv> (Gr (darts h) (face h))\<^sup>+"
+  "cface h \<equiv> (Gr (darts h) (face h))"
 
-lemma cface_sym: "sym (cface H)"
-  by (simp add: perm_trancl_sym cface_def perm_face)
+lemma cface_reachable_sym: "u \<rightarrow>\<^sup>*\<^bsub>cface H\<^esub>v \<Longrightarrow> v \<rightarrow>\<^sup>*\<^bsub>cface H\<^esub> u "
+  by (metis cface_def finite_darts perm_face perm_on.intro perm_on.perm_reach_sym)
 
 section \<open>Components\<close>
-definition glink :: "'a hypermap \<Rightarrow> 'a rel"
-  where "glink h = (Gr (darts h) (edge h)) \<union>
-                   (Gr (darts h) (node h)) \<union>
-                   (Gr (darts h) (face h))"
+definition glink
+  where "glink h = union (cedge h) (union (cnode h) (cface h))"
 
-lemma glink_rtrancl_sym: "sym ((glink H)\<^sup>*)"
-  by (smt (verit, ccfv_threshold) cface_sym cnode_sym cedge_sym sym_rtrancl glink_def hypermap_axioms
-      perm_edge perm_face perm_node perm_trancl_sym rtrancl_Un_rtrancl sym_Un trancl_rtrancl_absorb)
-
-corollary glink_trancl_sym: "sym ((glink H)\<^sup>+)"
-    by (metis rtranclD sym_def trancl_into_rtrancl glink_rtrancl_sym)
+lemma glink_reachable_sym: "u \<rightarrow>\<^sup>*\<^bsub>glink H\<^esub>v \<Longrightarrow> v \<rightarrow>\<^sup>*\<^bsub>glink H\<^esub> u"
+  using cface_reachable_sym cnode_reachable_sym cedge_reachable_sym sorry
 
 definition connected_hypermap :: "'a hypermap \<Rightarrow> bool" where
-"connected_hypermap h \<equiv> strongly_connected (rel_to_digraph (glink h))"
+"connected_hypermap h \<equiv> strongly_connected (glink h)"
 
 text \<open>All connected components are in the same equivalence class\<close>
 section \<open>Genus\<close>
@@ -78,7 +72,7 @@ definition euler_rhs :: "'a hypermap \<Rightarrow> nat" where
                count_cycles_on (darts h) (face h)"
 
 definition euler_lhs :: "'a hypermap \<Rightarrow> nat" where
-"euler_lhs h = card (sccs (glink h)) * 2 + card (darts h)"
+"euler_lhs h = card (pre_digraph.sccs (glink h)) * 2 + card (darts h)"
 
 definition genus where
 "genus h \<equiv> (euler_lhs h - euler_rhs h) div 2"
@@ -87,8 +81,8 @@ definition planar where
 "planar h \<equiv> genus h = 0"
 
 section \<open>Jordan\<close>
-definition clink :: "'a hypermap \<Rightarrow> 'a rel" where
-"clink g \<equiv> (Gr (darts g) (face g)) \<union> (Gr (darts g) (node g))\<inverse>"
+definition clink where
+"clink g \<equiv> union cface (Gr (darts g) (node g))\<inverse>"
 
 lemma clinkP:
   assumes "x \<in> darts H" and "y \<in> darts H"
