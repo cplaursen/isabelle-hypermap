@@ -35,6 +35,31 @@ lemma reachable1:
   shows "a\<rightarrow>\<^sup>*\<^bsub>G\<^esub>b"
   by (metis assms reachable_def rtrancl_on.simps)
 
+definition pair_union :: "'a pair_pre_digraph \<Rightarrow> 'a pair_pre_digraph \<Rightarrow> 'a pair_pre_digraph" where
+"pair_union g h \<equiv> \<lparr> pverts = pverts g \<union> pverts h, parcs = parcs g \<union> parcs h\<rparr>"
+
+lemma with_proj_union[simp]: "with_proj (pair_union g h) = union (with_proj g) (with_proj h)"
+  by (simp add: pair_union_def)
+
+lemma comm_pair_union: "pair_union g h = pair_union h g"
+  unfolding pair_union_def by auto
+
+lemma wf_pair_union:
+  assumes "pair_wf_digraph g" "pair_wf_digraph h"
+  shows "pair_wf_digraph (pair_union g h)"
+  by (metis assms compatibleI_with_proj wellformed_union wf_digraph_wp_iff with_proj_union)
+
+lemma arc_in_union: "x\<rightarrow>\<^bsub>with_proj g\<^esub>y \<Longrightarrow> x\<rightarrow>\<^bsub>pair_union g h\<^esub>y"
+  using with_proj_union apply simp
+  by (metis Un_iff arcs_union with_proj_simps(2) with_proj_simps(3) with_proj_union)
+
+definition reverse :: "'a pair_pre_digraph \<Rightarrow> 'a pair_pre_digraph" ("(_\<^sup>R)" [1000] 999) where
+"reverse a = \<lparr>pverts = pverts a, parcs = (parcs a)\<inverse>\<rparr>"
+
+lemma wf_reverse: "pair_wf_digraph g \<Longrightarrow> pair_wf_digraph (g\<^sup>R)"
+  unfolding reverse_def
+  by (smt (verit, ccfv_SIG) converseE fst_swap pair_pre_digraph.select_convs(1) pair_pre_digraph.select_convs(2) pair_wf_digraph_def swap_simp)
+
 text \<open>Pair digraph of a function\<close>
 
 definition Gr :: "'a set \<Rightarrow> ('a \<Rightarrow> 'a) \<Rightarrow> 'a pair_pre_digraph" where
@@ -42,6 +67,11 @@ definition Gr :: "'a set \<Rightarrow> ('a \<Rightarrow> 'a) \<Rightarrow> 'a pa
 
 lemma Gr_eq: "a\<rightarrow>\<^bsub>Gr S f\<^esub> b \<longleftrightarrow> a \<in> S \<and> f a = b"
   unfolding Gr_def by auto
+
+lemma Gr_wf:
+  assumes "\<forall>a \<in> S. f a \<in> S"
+  shows "pair_wf_digraph (Gr S f)"
+  by (simp add: Fun_Graph.Gr_def assms pair_wf_digraph_def)
 
 lemma funpow_in_rtrancl:
   assumes "a \<in> S" "\<forall> x \<in> S. f x \<in> S"
