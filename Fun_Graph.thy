@@ -29,6 +29,11 @@ lemma set_perm_subset:
   shows "set_perm p \<subseteq> S"
   by (meson permutes_not_in apply_perm_neq_idI assms subsetI)
 
+lemma permutes_perm:
+  assumes "finite S" "f permutes S"
+  shows "(Perm f) permutes S"
+  by (metis (no_types, lifting) Perm_inverse assms mem_Collect_eq permutation permutation_permutes)
+
 text \<open>Digraph extras\<close>
 lemma reachable1:
   assumes "a \<rightarrow>\<^bsub>G\<^esub> b" "a \<in> verts G" "b \<in> verts G"

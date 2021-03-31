@@ -1,22 +1,24 @@
 theory Hypermap
-  imports "Fun_Graph" (*"Rel_Digraph"*)
+  imports "Fun_Graph"
 begin
 
 section \<open>Hypermap\<close>
 
-record 'a hypermap =
+record 'a pre_hypermap =
   darts :: "'a set"
   edge :: "'a perm"
   node :: "'a perm"
   face :: "'a perm"
 
-locale hypermap =
-  fixes H :: "'a hypermap" (structure)
+locale pre_hypermap =
+  fixes H :: "'a pre_hypermap" (structure)
+
+locale hypermap = pre_hypermap +
   assumes edgeK: "edge H (node H (face H x)) = x"
   and finite_darts: "finite (darts H)"
-  and darts_edge: "set_perm (edge H) \<subseteq> darts H"
-  and darts_node: "set_perm (node H) \<subseteq> darts H"
-  and darts_face: "set_perm (face H) \<subseteq> darts H"
+  and perm_edge: "edge H permutes darts H"
+  and perm_node: "node H permutes darts H"
+  and perm_face: "face H permutes darts H"
 begin
 
 text \<open>Basic properties of the functions\<close>
@@ -26,14 +28,14 @@ lemma nodeK: "\<And>x. node H (face H (edge H x)) = x"
 lemma faceK: "\<And>x. face H (edge H (node H x)) = x"
   by (meson apply_inj_eq_iff nodeK)
 
-lemma perm_edge: "(edge H) permutes (darts H)"
-  by (meson bij_betw_apply_perm bij_imp_permutes darts_edge in_mono in_set_permI)
+lemma darts_edge: "set_perm (edge H) \<subseteq> darts H"
+  by (simp add: perm_edge set_perm_subset)
 
-lemma perm_node: "(node H) permutes (darts H)"
-  by (meson bij_betw_apply_perm bij_imp_permutes darts_node in_mono in_set_permI)
+lemma darts_node: "set_perm (node H) \<subseteq> darts H"
+  by (simp add: perm_node set_perm_subset)
 
-lemma perm_face: "(face H) permutes (darts H)"
-  by (meson bij_betw_apply_perm bij_imp_permutes darts_face in_mono in_set_permI)
+lemma darts_face: "set_perm (face H) \<subseteq> darts H"
+  by (simp add: perm_face set_perm_subset)
 
 text \<open>Cycles\<close>
 definition cedge where
@@ -56,22 +58,37 @@ lemma cface_reachable_sym: "u \<rightarrow>\<^sup>*\<^bsub>cface H\<^esub>v \<Lo
 
 section \<open>Components\<close>
 definition glink
-  where "glink h = union (cedge h) (union (cnode h) (cface h))"
+  where "glink h = pair_union (cedge h) (pair_union (cnode h) (cface h))"
+
+lemma glink_wf: "pair_wf_digraph (glink H)"
+  unfolding cedge_def cnode_def cface_def glink_def
+  by (metis Gr_wf compatibleI_with_proj perm_edge perm_face perm_node permutes_in_image 
+            wellformed_union wf_digraph_wp_iff with_proj_union)
 
 lemma glink_reachable_sym: "u \<rightarrow>\<^sup>*\<^bsub>glink H\<^esub>v \<Longrightarrow> v \<rightarrow>\<^sup>*\<^bsub>glink H\<^esub> u"
-  using cface_reachable_sym cnode_reachable_sym cedge_reachable_sym sorry
+proof -
+  interpret pair_wf_digraph "glink H" by (simp add: glink_wf)
+  assume "u \<rightarrow>\<^sup>*\<^bsub>glink H\<^esub>v" then show ?thesis
+  proof (induct rule: reachable_induct)
+    case base
+    then show ?case by simp
+  next
+    case (step x y)
+    then show ?case sorry
+  qed
+qed
 
-definition connected_hypermap :: "'a hypermap \<Rightarrow> bool" where
+definition connected_hypermap :: "'a pre_hypermap \<Rightarrow> bool" where
 "connected_hypermap h \<equiv> strongly_connected (glink h)"
 
 text \<open>All connected components are in the same equivalence class\<close>
 section \<open>Genus\<close>
-definition euler_rhs :: "'a hypermap \<Rightarrow> nat" where
+definition euler_rhs :: "'a pre_hypermap \<Rightarrow> nat" where
 "euler_rhs h = count_cycles_on (darts h) (edge h) +
                count_cycles_on (darts h) (node h) +
                count_cycles_on (darts h) (face h)"
 
-definition euler_lhs :: "'a hypermap \<Rightarrow> nat" where
+definition euler_lhs :: "'a pre_hypermap \<Rightarrow> nat" where
 "euler_lhs h = card (pre_digraph.sccs (glink h)) * 2 + card (darts h)"
 
 definition genus where
@@ -81,34 +98,54 @@ definition planar where
 "planar h \<equiv> genus h = 0"
 
 section \<open>Jordan\<close>
+
 definition clink where
-"clink g \<equiv> union cface (Gr (darts g) (node g))\<inverse>"
+"clink h \<equiv> pair_union (cface h) ((cnode h)\<^sup>R)"
+
+lemma wf_clink: "pair_wf_digraph (clink H)"
+proof -
+  have "pair_wf_digraph (cface H)"
+    by (simp add: Gr_wf cface_def darts_face)
+  also have "pair_wf_digraph ((cnode H)\<^sup>R)"
+    by (simp add: Gr_wf cnode_def wf_reverse darts_node)
+  ultimately show ?thesis
+    unfolding clink_def by (rule wf_pair_union)
+qed
 
 lemma clinkP:
   assumes "x \<in> darts H" and "y \<in> darts H"
-  shows "(x = node H y \<or> face H x = y) \<Longrightarrow> (x,y) \<in> clink H"
+  shows "(y\<rightarrow>\<^bsub>cnode H\<^esub> x \<or> x \<rightarrow>\<^bsub>cface H\<^esub> y) \<Longrightarrow> x\<rightarrow>\<^bsub>clink H\<^esub> y"
   unfolding clink_def apply (erule disjE)
-  using Gr_def assms by auto+
+   apply (metis (no_types, lifting) UnI2 arcs_union converse_iff pair_pre_digraph.select_convs(2) reverse_def with_proj_simps(2) with_proj_simps(3) with_proj_union)
+  by (metis (no_types, lifting) UnI1 arcs_union with_proj_simps(2) with_proj_simps(3) with_proj_union)
 
-lemma clinkN: "x \<in> darts H \<Longrightarrow> ((node H x), x) \<in> clink H"
-  by (simp add: Gr_eq clink_def)
+lemma clinkN: "x \<in> darts H \<Longrightarrow> node H x\<rightarrow>\<^bsub>clink H\<^esub>x"
+  by (metis Gr_eq clinkP cnode_def perm_node permutes_in_image)
 
-lemma clinkF: "x \<in> darts H \<Longrightarrow> (x, (face H x)) \<in> clink H"
-  by (simp add: Gr_eq clink_def)
+lemma clinkF: "x \<in> darts H \<Longrightarrow> x\<rightarrow>\<^bsub>clink H\<^esub>face H x"
+  by (metis Gr_eq cface_def hypermap.clinkP hypermap_axioms perm_face permutes_in_image)
 
-lemma clink_rtrancl_sym: "sym ((clink H)\<^sup>*)"
-  by (smt (verit, ccfv_threshold) clink_def converse_Un perm_face perm_node perm_rtrancl_sym
-           rtrancl_Un_rtrancl rtrancl_converse sym_conv_converse_eq trancl_converse)
-
-corollary clink_trancl_sym: "sym ((clink H)\<^sup>+)"
-  by (metis clink_rtrancl_sym rtranclD sym_def trancl_into_rtrancl)
-  
-lemma clink_glink: "(clink H)\<^sup>* = (glink H)\<^sup>*"
-proof
-  show "(clink H)\<^sup>* \<subseteq> (glink H)\<^sup>*"
-      by (smt (z3) Un_subset_iff clink_def converse_subset_swap glink_def glink_rtrancl_sym
-          rtrancl_subset_rtrancl rtrancl_trancl_reflcl sup.cobounded1 sym_conv_converse_eq trancl_unfold)
+lemma clink_rtrancl_sym: "u \<rightarrow>\<^sup>*\<^bsub>clink H\<^esub>v \<Longrightarrow> v \<rightarrow>\<^sup>*\<^bsub>clink H\<^esub> u"
+proof -
+  interpret pair_wf_digraph "clink H" by (rule wf_clink)
+  assume "u \<rightarrow>\<^sup>*\<^bsub>clink H\<^esub>v" then show ?thesis
+  proof (induct rule: reachable_induct)
+    case base
+    then show ?case by simp
   next
+    case (step x y)
+    then show ?case sorry
+  qed
+qed
+
+lemma clink_glink: "u \<rightarrow>\<^sup>*\<^bsub>clink H\<^esub>v \<longleftrightarrow> u \<rightarrow>\<^sup>*\<^bsub>glink H\<^esub>v" (is "?L \<longleftrightarrow> ?R")
+proof
+  assume ?L then show ?R
+    sorry
+next
+  assume ?R then show ?L
+    sorry
+    (*
     have "glink H \<subseteq> (clink H)\<^sup>*"
     proof
       fix z assume "z \<in> glink H"
@@ -124,25 +161,31 @@ proof
       ultimately show "z \<in> (clink H)\<^sup>*" using \<open>(x,y) = z\<close> by blast
     qed
     then show "(glink H)\<^sup>* \<subseteq> (clink H)\<^sup>*"
-      by (rule rtrancl_subset_rtrancl)
+      by (rule rtrancl_subset_rtrancl)*)
 qed
 
+context begin
+interpretation pair_wf_digraph "clink H" by (rule wf_clink)
 
 lemma connected_clink:
   assumes "connected_hypermap H" "x \<in> (darts H)" "y \<in> (darts H)"
-  shows "x \<rightarrow>\<^sup>*\<^bsub>(rel_to_digraph (clink H))\<^esub> y"
+  shows "\<exists>p. apath x p y"
   using clink_glink assms connected_hypermap_def sorry
 
 definition appears_before :: "'a list \<Rightarrow> 'a \<Rightarrow> 'a \<Rightarrow> bool" where
 "appears_before p x y = (y \<in> set (dropWhile (\<lambda> z. z \<noteq> x) p))"
 
-fun moebius_path :: "'a hypermap \<Rightarrow> 'a vwalk \<Rightarrow> bool" where
-  "moebius_path _ [] = False"
-| "moebius_path h p = (vpath p (rel_to_digraph (clink h)) \<and>
-            (\<exists>n. ((n, (last p)) \<in> (Gr (darts h) (node h))) \<and> appears_before p n (node h (hd p))))"
+text \<open>A "Moebius path" is a contour that cannot appear in a planar map, as it goes from the inside
+      of a ring to the outside\<close>
 
-definition jordan :: "'a hypermap \<Rightarrow> bool" where
+fun moebius_path :: "'a pre_hypermap \<Rightarrow> ('a\<times>'a) awalk  \<Rightarrow> bool" where
+  "moebius_path _ [] = False"
+| "moebius_path h p = (\<exists> x y. apath x p y \<and> 
+            (\<exists>n. n\<rightarrow>\<^bsub>cnode h\<^esub>y \<and> appears_before (awalk_verts x p) n (node h (awhd x p))))"
+
+definition jordan :: "'a pre_hypermap \<Rightarrow> bool" where
 "jordan h = (\<forall>p. \<not> (moebius_path h p))"
+end
 
 end
 end
