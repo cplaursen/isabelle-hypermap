@@ -2,53 +2,6 @@ theory Walkup
   imports Hypermap
 begin         
 
-(*lemma skip_cycles_card:
-"card (cycles_of_perm (Perm (skip z (p :: 'a perm)))) \<le> card (cycles_of_perm p)"
-proof -
-  define C where "C = cycles_of_perm p"
-  define C' where "C' = cycles_of_perm (Perm (skip z p))"
-  have disj: "disjoint_cycles C" by (auto simp add: C_def)
-  have disj': "disjoint_cycles C'" by (auto simp add: C'_def)
-  then have c_imp: "\<And>x. p z \<notin> set_cycle x \<and> x \<in> C \<Longrightarrow> x \<in> C'"
-    using C_def C'_def apply_set_perm cycles_of_perm_altdef mem_Collect_eq set_perm_cycle skip_perm
-    by (smt (verit, ccfv_threshold) not_in_set_perm skip_def)  
-  thus ?thesis
-  proof (cases "z = p z")
-    case True
-    then have "\<And>c. c \<in> C \<Longrightarrow> c \<in> C'"
-      by (metis c_imp C_def apply_perm_neq_idI in_mono set_cycle_of_perm_subset)
-    then show ?thesis
-      by (metis True apply_inj_eq_iff order_refl perm_eq_iff skip_id skip_invariant skip_perm)
-  next
-    case False
-    then have "z \<in> set_perm p" by auto
-    also have "z \<notin> set_perm (Perm (skip z p))"
-      by (metis apply_perm_neq_idI skip_id skip_perm)
-    moreover have "c \<in> C' \<and> c \<notin> C \<Longrightarrow> p z \<in> set_cycle c"
-      (*by (metis apply_inj_eq_iff skip_id skip_perm start_in_perm_orbit_iff) - \<ge> 1s*)
-      by (smt (verit, ccfv_SIG) C'_def C_def apply_cycle_in_set_iff apply_perm_cycle cycle_perm_same_iff cycles_of_perm_altdef mem_Collect_eq skip_def skip_perm)
-    moreover have diff_cycle: "p (p z) \<noteq> z \<Longrightarrow> \<exists>c \<in> C'. p z \<in> set_cycle c"
-      by (metis C'_def apply_perm_eq_same_iff(2) apply_set_perm perm_orbit_in_cycles_of_perm skip_def skip_perm start_in_perm_orbit_iff)
-    ultimately have "p (p z) = z \<Longrightarrow> C' \<subseteq> C"
-      by (smt (verit, ccfv_SIG) C'_def C_def apply_inj_eq_iff cycle_perm_same_iff cycles_of_perm_altdef mem_Collect_eq skip_def skip_perm subsetI)
-    then show ?thesis
-    proof (cases "p (p z) = z")
-      case True
-      then show ?thesis
-        by (metis C'_def C_def \<open>p \<langle>$\<rangle> p \<langle>$\<rangle> z = z \<Longrightarrow> C' \<subseteq> C\<close> card_mono finite_cycles_of_perm)
-    next
-      case False
-      then obtain x where "x \<in> C' \<and> x \<notin> C"
-        using disj disj' diff_cycle
-        by (smt (verit) C'_def C_def \<open>z \<notin> set_perm (Perm (skip z ((\<langle>$\<rangle>) p)))\<close> apply_cycle_cycles_of_perm apply_perm_cycle apply_perm_eq_same_iff(2) apply_perm_in_perm_orbit_iff perm_orbit_eqI)
-      then have "p z \<in> set_cycle x" using \<open>c \<in> C' \<and> c \<notin> C \<Longrightarrow> p z \<in> set_cycle c\<close> oops
-      then have "set_cycle (perm_orbit p z) = set_cycle c \<union> {z}"
-        
-      then show ?thesis
-    qed
-  qed
-qed*)
-
 context hypermap begin
 text \<open>Special case for triangular identity - either merge two cycles or split a cycle
          - If z and node z are on different e cycles walkupE merges them

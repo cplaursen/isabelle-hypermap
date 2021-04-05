@@ -76,7 +76,8 @@ definition reverse :: "'a pair_pre_digraph \<Rightarrow> 'a pair_pre_digraph" ("
 
 lemma wf_reverse: "pair_wf_digraph g \<Longrightarrow> pair_wf_digraph (g\<^sup>R)"
   unfolding reverse_def
-  by (smt (verit, ccfv_SIG) converseE fst_swap pair_pre_digraph.select_convs(1) pair_pre_digraph.select_convs(2) pair_wf_digraph_def swap_simp)
+  by (smt (verit, ccfv_SIG) converseE fst_swap pair_pre_digraph.select_convs(1)
+      pair_pre_digraph.select_convs(2) pair_wf_digraph_def swap_simp)
 
 lemma arc_reverse: "x\<rightarrow>\<^bsub>with_proj g\<^esub>y \<Longrightarrow> y\<rightarrow>\<^bsub>g\<^sup>R\<^esub>x"
   by (simp add: reverse_def)
@@ -98,10 +99,10 @@ lemma skip_invariant: "x \<noteq> z \<Longrightarrow> f x \<noteq> z \<Longright
 lemma inj_skip: "inj f \<Longrightarrow> inj (skip z f)"
   unfolding skip_def by (smt (verit, ccfv_SIG) injD inj_on_def)
 
-definition skip_perm where
+definition skip_perm :: "'a \<Rightarrow> 'a perm \<Rightarrow> 'a perm" where
 "skip_perm \<equiv> (\<lambda>z (p ::'a perm). Perm (skip z p))"
 
-lemma skip_Perm: "(\<langle>$\<rangle>) (skip_perm z p) = skip z p"
+lemma apply_skip_perm: "(\<langle>$\<rangle>) (skip_perm z p) = skip z p"
 unfolding skip_perm_def
 proof
   obtain A where "A = set_perm p" by simp
@@ -117,6 +118,9 @@ proof
    qed
 qed
 
+lemma skip_perm_notin: "z \<notin> set_perm p \<Longrightarrow> skip_perm z p = p"
+  by (smt (z3) apply_perm_inverse_eq_iff apply_perm_inverse_not_in_set apply_skip_perm perm_eq_iff skip_def)
+
 lemma perm_skip_image:
   assumes "(f::'a perm) permutes S"
   shows "(skip z f) ` (S - {z}) = S - {z}"
@@ -130,13 +134,15 @@ proof
       then have "skip z f y = z"
           by (simp add: skip_def)
         then show ?thesis
-        by (smt (verit, ccfv_threshold) Diff_iff Permutations.permutes_not_in y_skip assms empty_iff image_iff injD insert_iff permutes_inj skip_def)
+          by (smt (verit, ccfv_threshold) Diff_iff Permutations.permutes_not_in y_skip assms empty_iff
+              image_iff injD insert_iff permutes_inj skip_def)
     next
       case False
       then have "skip z f y = f y \<or> skip z f y = f z"
         by (simp add: skip_def)
       then show ?thesis
-        by (smt (verit, ccfv_SIG) y_skip Diff_iff False assms empty_iff image_iff insert_iff permutes_in_image skip_def)
+        by (smt (verit, ccfv_SIG) y_skip Diff_iff False assms empty_iff image_iff insert_iff
+            permutes_in_image skip_def)
     qed
   qed
 next
@@ -184,34 +190,79 @@ next
     then have "a = hd (rotate n l) \<Longrightarrow> rotate m (remove1 a l) = remove1 a (rotate (Suc n) l)"
       by (metis * rotate_Suc append_Nil2 assms distinct_remove1_removeAll distinct_rotate
           list.exhaust_sel removeAll.simps(2) removeAll_append rotate1.simps(2) rotate_is_Nil_conv)
-    also
-    { have "a \<noteq> hd l \<Longrightarrow> rotate1 (remove1 a l) = remove1 a (rotate1 l)"
-        by (smt (z3) Suc.prems hd_Cons_tl insert_iff list.simps(15) remove1.simps(2) remove1_append remove1_idem rotate1.simps(2) set_rotate1)
-      then have "a \<noteq> hd (rotate n l) \<Longrightarrow> rotate (Suc m) (remove1 a l) = remove1 a (rotate (Suc n) l)"
-        by (smt (z3) assms rotate_Suc * distinct_remove1_removeAll distinct_rotate list.exhaust_sel
-            removeAll.simps(2) removeAll_append rotate1.simps(2) rotate_is_Nil_conv assms
-            distinct.simps(1) remove1.simps(1))
-    }
+    also have "a \<noteq> hd l \<Longrightarrow> rotate1 (remove1 a l) = remove1 a (rotate1 l)"
+      by (smt (z3) Suc.prems hd_Cons_tl insert_iff list.simps(15) remove1.simps(2) remove1_append
+          remove1_idem rotate1.simps(2) set_rotate1)
+    then have "a \<noteq> hd (rotate n l) \<Longrightarrow> rotate (Suc m) (remove1 a l) = remove1 a (rotate (Suc n) l)"
+        by (simp; smt (z3) * insert_iff list.exhaust_sel list.set(2) remove1.simps(2) remove1_append
+              remove1_idem rotate1.simps(2) rotate_is_Nil_conv set_rotate1)
     then show ?case using calculation by blast
   qed
-qed
-
+qed                                  
 
 text \<open>Need to set xs to [] if length is 2 to satisfy rel_cycle\<close>
 lift_definition remove1_cycle :: "'a \<Rightarrow> 'a cycle \<Rightarrow> 'a cycle" is 
-  "\<lambda>a xs. if length xs = 2 then [] else remove1 a xs"
+  "\<lambda>a xs. let xs' = remove1 a xs in (if length xs' = 1 then [] else xs')"
 proof (auto simp add: cycle_rel_def)
-  fix a::"'a" and l::"'a list" assume "distinct l" "length l \<noteq> Suc 0" "length l \<noteq> 2"
-  then show "length (remove1 a l) = Suc 0 \<Longrightarrow> False"
-    by (metis One_nat_def Suc_pred length_pos_if_in_set length_remove1 numeral_2_eq_2)
-  fix n show "\<exists>m. rotate m (remove1 a l) = remove1 a (rotate n l)"
-    using \<open>distinct l\<close> by (rule rotate_remove1)
+  fix a::"'a" and l::"'a list" assume assms: "distinct l" "length l \<noteq> Suc 0"
+  show "distinct (let xs' = remove1 a l in if length xs' = Suc 0 then [] else xs')"
+    by (metis (full_types) assms(1) distinct.simps(1) distinct_remove1)
+  show "length (let xs' = remove1 a l in if length xs' = Suc 0 then [] else xs') = Suc 0 \<Longrightarrow> False"
+    by (metis (full_types) One_nat_def less_numeral_extra(1) less_numeral_extra(3) list.size(3))
+  fix n show "\<exists>na. rotate na (let xs' = remove1 a l in if length xs' = Suc 0 then [] else xs')
+              = (let xs' = remove1 a (rotate n l) in if length xs' = Suc 0 then [] else xs')"
+    using \<open>distinct l\<close> rotate_remove1 by (smt (z3) length_rotate rotate_is_Nil_conv)
+qed
+
+lemma remove1_cycle_noteq: "x \<in> set_cycle c \<longleftrightarrow> remove1_cycle x c \<noteq> c"
+proof
+  show "x \<in> set_cycle c \<Longrightarrow> remove1_cycle x c \<noteq> c"
+    apply transfer
+    by (metis (mono_tags) One_nat_def Suc_pred cycle_rel_def cycle_rel_imp_same_set empty_iff
+        length_pos_if_in_set length_remove1 length_rotate lessI list.set(1) order_less_irrefl)
+  show "remove1_cycle x c \<noteq> c \<Longrightarrow> x \<in> set_cycle c"
+    apply transfer
+    using remove1_idem by force
 qed
 
 lemma cycles_skip:
-  assumes "C = cycles_of_perm p" "set_perm p \<subseteq> S" "z \<in> S"
-  shows "cycles_of_perm (skip_perm z p) = C - {perm_orbit p z} \<union> {remove1_cycle z (perm_orbit p z)}"
-  oops
+  assumes "z \<in> set_perm p"
+  shows "cycles_of_perm p = cycles_of_perm (skip_perm z p) \<union>
+       {perm_orbit p z} - {remove1_cycle z (perm_orbit p z)}" (is "?C = ?C' \<union> {?poz} - {?poz'}")
+proof (rule subset_antisym; rule subsetI)
+  have disj: "disjoint_cycles ?C" "disjoint_cycles ?C'" by auto
+  have poz_subset: "set_cycle ?poz' \<subseteq> set_cycle ?poz"
+      apply transfer by (smt (z3) set_remove1_subset empty_subsetI list.set(1))
+  {
+    fix x assume "x \<in> ?C"
+      then have "z \<notin> set_cycle x \<Longrightarrow> x \<in> ?C'"
+        by (smt (verit, ccfv_threshold) apply_skip_perm skip_invariant apply_set_perm cycles_of_perm_altdef
+            mem_Collect_eq set_perm_cycle)
+      also have x_orbit: "z \<in> set_cycle x \<Longrightarrow> x = perm_orbit p z"
+        using \<open>x \<in> cycles_of_perm p\<close> perm_orbit_eqI by fastforce
+      have "?poz \<noteq> ?poz'" 
+          by (metis apply_perm_neq_idI assms remove1_cycle_noteq start_in_perm_orbit_iff)
+      hence "x \<noteq> ?poz'"
+          by (smt (verit, ccfv_SIG) poz_subset \<open>x \<in> ?C\<close> x_orbit apply_perm_neq_idI cycles_funpow cycles_of_perm_def
+              funpow_apply_perm_in_perm_orbit_iff imageE in_mono start_in_perm_orbit calculation disj)
+      then show "x \<in> ?C' \<union> {?poz} - {?poz'}"
+        using x_orbit calculation by blast
+  }
+  fix x assume x_in: "x \<in> ?C' \<union> {?poz} - {?poz'}"    
+  also have "?poz \<in> ?C"
+    using assms by (rule perm_orbit_in_cycles_of_perm)
+  moreover have "x \<noteq> ?poz' \<Longrightarrow> x \<in> ?C' \<Longrightarrow> x \<in> ?C"
+    sorry
+  ultimately show "x \<in> ?C"
+    using x_in by blast
+qed
+
+corollary skip_cycles_card: "card (cycles_of_perm (skip_perm z p)) \<le> card (cycles_of_perm p)"
+  by (smt (z3) cycles_skip Diff_iff Diff_insert_absorb Un_insert_right apply_perm_neq_idI
+      boolean_algebra_cancel.sup0 card_Diff_insert card_eq_0_iff card_insert_if card_mono
+      cycles_of_perm_altdef finite_cycles_of_perm in_set_permI insert_absorb insert_not_empty
+      mem_Collect_eq nat.simps(3) perm_orbit_eqI perm_orbit_in_cycles_of_perm skip_perm_notin
+      start_in_perm_orbit_iff subset_eq)
 
 section \<open>Pair digraph of a function\<close>
 
