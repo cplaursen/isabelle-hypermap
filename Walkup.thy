@@ -1,82 +1,59 @@
 theory Walkup
   imports Hypermap
-begin
+begin         
 
-text \<open>Differs from the Coq definition in that here we explicitly set
-      skip z f z = z. This preserves permutations, which would otherwise have
-      a dangling link.\<close>
-definition skip :: "'a \<Rightarrow> ('a \<Rightarrow> 'a) \<Rightarrow> ('a \<Rightarrow> 'a) " where
-"skip z f \<equiv> \<lambda> y. (if y = z then z else (if f y = z then f z else f y))"
-
-lemma skip_id: "skip z f z = z"
-  unfolding skip_def by simp
-
-lemma skip_perm: "(\<langle>$\<rangle>) (Perm (skip z (p :: 'a perm))) = skip z p"
-proof
-  obtain A where "A = set_perm p" by auto
-  then have set_perm_A: "finite A" "inj_on p A" "(\<forall>x\<in>A. p x \<in> A)" "(\<forall>x. x\<notin>A \<longrightarrow> p x = x)"
-    by auto
-  fix x show "(Perm (skip z p)) \<langle>$\<rangle> x = skip z p x"
-  proof (rule apply_perm_Perm)
-    show "finite A" using set_perm_A(1) by auto
-    show "inj_on (skip z p) A"
-      by (smt (z3) set_perm_A inj_on_def skip_def)
-    show "\<And>x. x \<in> A \<Longrightarrow> skip z ((\<langle>$\<rangle>) p) x \<in> A"
-      by (metis skip_def set_perm_A(3))
-    show "\<And>x. x \<notin> A \<Longrightarrow> skip z ((\<langle>$\<rangle>) p) x = x"
-      by (metis set_perm_A(4) skip_def)
-  qed
-qed
-
-lemma perm_skip_image:
-  assumes "(f::'a perm) permutes S"
-  shows "(skip z f) ` (S - {z}) = S - {z}"
-proof
-  show "(skip z f) ` (S - {z}) \<subseteq> (S - {z})"
-  proof
-    fix y assume y_skip: "y \<in> skip z f ` (S - {z})"
-    then show "y \<in> (S - {z})"
-    proof (cases "y = z")
+(*lemma skip_cycles_card:
+"card (cycles_of_perm (Perm (skip z (p :: 'a perm)))) \<le> card (cycles_of_perm p)"
+proof -
+  define C where "C = cycles_of_perm p"
+  define C' where "C' = cycles_of_perm (Perm (skip z p))"
+  have disj: "disjoint_cycles C" by (auto simp add: C_def)
+  have disj': "disjoint_cycles C'" by (auto simp add: C'_def)
+  then have c_imp: "\<And>x. p z \<notin> set_cycle x \<and> x \<in> C \<Longrightarrow> x \<in> C'"
+    using C_def C'_def apply_set_perm cycles_of_perm_altdef mem_Collect_eq set_perm_cycle skip_perm
+    by (smt (verit, ccfv_threshold) not_in_set_perm skip_def)  
+  thus ?thesis
+  proof (cases "z = p z")
+    case True
+    then have "\<And>c. c \<in> C \<Longrightarrow> c \<in> C'"
+      by (metis c_imp C_def apply_perm_neq_idI in_mono set_cycle_of_perm_subset)
+    then show ?thesis
+      by (metis True apply_inj_eq_iff order_refl perm_eq_iff skip_id skip_invariant skip_perm)
+  next
+    case False
+    then have "z \<in> set_perm p" by auto
+    also have "z \<notin> set_perm (Perm (skip z p))"
+      by (metis apply_perm_neq_idI skip_id skip_perm)
+    moreover have "c \<in> C' \<and> c \<notin> C \<Longrightarrow> p z \<in> set_cycle c"
+      (*by (metis apply_inj_eq_iff skip_id skip_perm start_in_perm_orbit_iff) - \<ge> 1s*)
+      by (smt (verit, ccfv_SIG) C'_def C_def apply_cycle_in_set_iff apply_perm_cycle cycle_perm_same_iff cycles_of_perm_altdef mem_Collect_eq skip_def skip_perm)
+    moreover have diff_cycle: "p (p z) \<noteq> z \<Longrightarrow> \<exists>c \<in> C'. p z \<in> set_cycle c"
+      by (metis C'_def apply_perm_eq_same_iff(2) apply_set_perm perm_orbit_in_cycles_of_perm skip_def skip_perm start_in_perm_orbit_iff)
+    ultimately have "p (p z) = z \<Longrightarrow> C' \<subseteq> C"
+      by (smt (verit, ccfv_SIG) C'_def C_def apply_inj_eq_iff cycle_perm_same_iff cycles_of_perm_altdef mem_Collect_eq skip_def skip_perm subsetI)
+    then show ?thesis
+    proof (cases "p (p z) = z")
       case True
-      then have "skip z f y = z"
-          by (simp add: skip_def)
-        then show ?thesis
-        by (smt (verit, ccfv_threshold) Diff_iff Permutations.permutes_not_in y_skip assms empty_iff image_iff injD insert_iff permutes_inj skip_def)
+      then show ?thesis
+        by (metis C'_def C_def \<open>p \<langle>$\<rangle> p \<langle>$\<rangle> z = z \<Longrightarrow> C' \<subseteq> C\<close> card_mono finite_cycles_of_perm)
     next
       case False
-      then have "skip z f y = f y \<or> skip z f y = f z"
-        by (simp add: skip_def)
+      then obtain x where "x \<in> C' \<and> x \<notin> C"
+        using disj disj' diff_cycle
+        by (smt (verit) C'_def C_def \<open>z \<notin> set_perm (Perm (skip z ((\<langle>$\<rangle>) p)))\<close> apply_cycle_cycles_of_perm apply_perm_cycle apply_perm_eq_same_iff(2) apply_perm_in_perm_orbit_iff perm_orbit_eqI)
+      then have "p z \<in> set_cycle x" using \<open>c \<in> C' \<and> c \<notin> C \<Longrightarrow> p z \<in> set_cycle c\<close> oops
+      then have "set_cycle (perm_orbit p z) = set_cycle c \<union> {z}"
+        
       then show ?thesis
-        by (smt (verit, ccfv_SIG) y_skip Diff_iff False assms empty_iff image_iff insert_iff permutes_in_image skip_def)
     qed
   qed
-next
-  show "S - {z} \<subseteq> skip z f ` (S - {z})"
-  proof
-    fix y assume "y \<in> S - {z}"
-    then have "\<exists>c \<in> S - {z}. skip z f c = y"
-      by (smt (verit, ccfv_threshold) assms member_remove permutes_def remove_def skip_def)
-    then show "y \<in> skip z f ` (S - {z})" by auto
-  qed
-qed
+qed*)
 
-lemma skip_permutes:
-  assumes "(f::'a perm) permutes S"
-  shows "skip z f permutes (S - {z})"
-proof -
-  from assms have perm_f: "(\<forall>x. x \<notin> S \<longrightarrow> f x = x) \<and> (\<forall>y. \<exists>!x. f x = y)"
-    by (metis permutes_def)
-  then have "(\<forall>x. x \<notin> (S - {z}) \<longrightarrow> skip z f x = x)"
-    by (simp add: skip_def)
-  moreover have "\<forall>y. \<exists>!x. skip z f x = y"
-    by (smt (verit, ccfv_threshold) perm_f skip_def)
-  ultimately show ?thesis
-    by (simp add: permutes_def)
-qed
-
+context hypermap begin
 text \<open>Special case for triangular identity - either merge two cycles or split a cycle
          - If z and node z are on different e cycles walkupE merges them
          - Otherwise, walkupE splits this cycle\<close>
+
 definition skip_edge where
 "skip_edge z h x \<equiv> if z = x then z else
                   (if (edge h z) = z then edge h x else
@@ -86,50 +63,69 @@ definition skip_edge where
 lemma skip_edge_id: "skip_edge z h z = z"
   unfolding skip_edge_def by simp
 
-lemma skip_edge_Perm: 
-  assumes "hypermap h"
-  shows "(\<langle>$\<rangle>) (Perm (skip_edge z h)) = skip_edge z h"
+lemma skip_edge_Perm: "(\<langle>$\<rangle>) (Perm (skip_edge z H)) = skip_edge z H"
 proof
-  obtain A where "A = darts h" by auto
-  fix x show "(Perm (skip_edge z h)) \<langle>$\<rangle> x = skip_edge z h x"
+  obtain A where "A = darts H" by auto
+  fix x show "(Perm (skip_edge z H)) \<langle>$\<rangle> x = skip_edge z H x"
   proof (rule apply_perm_Perm)
     show "finite (A - {z})"
-      by (simp add: \<open>A = darts h\<close> assms hypermap.finite_darts)
-    show "inj_on (skip_edge z h) (A - {z})"
-      by (smt (z3) apply_inj_eq_iff assms hypermap.faceK inj_on_def skip_edge_def)
-    show "\<And>x. x \<in> (A - {z}) \<Longrightarrow> skip_edge z h x \<in> (A - {z})"
-      by (smt (z3) Diff_iff \<open>A = darts h\<close> apply_inj_eq_iff assms empty_iff hypermap.faceK hypermap.perm_edge hypermap.perm_face insert_iff permutes_in_image skip_edge_def)
-    show "\<And>x. x \<notin> (A - {z}) \<Longrightarrow> skip_edge z h x = x"
-      by (smt (z3) Diff_empty Diff_insert0 Permutations.permutes_not_in \<open>A = darts h\<close> assms hypermap.perm_edge hypermap.perm_face insert_Diff insert_iff skip_edge_def)
+      by (simp add: \<open>A = darts H\<close> finite_darts)
+    show "inj_on (skip_edge z H) (A - {z})"
+      by (smt (z3) apply_inj_eq_iff faceK inj_on_def skip_edge_def)
+    show "\<And>x. x \<in> (A - {z}) \<Longrightarrow> skip_edge z H x \<in> (A - {z})"
+      by (smt (z3) Diff_iff \<open>A = darts H\<close> apply_inj_eq_iff empty_iff faceK perm_edge perm_face insert_iff permutes_in_image skip_edge_def)
+    show "\<And>x. x \<notin> (A - {z}) \<Longrightarrow> skip_edge z H x = x"
+      by (smt (z3) Diff_empty Diff_insert0 Permutations.permutes_not_in \<open>A = darts H\<close> perm_edge perm_face insert_Diff insert_iff skip_edge_def)
   qed
 qed
 
-lemma skip_edge_subproof:
-  assumes "u \<noteq> z" "hypermap H"
-  shows "skip_edge z H u \<noteq> z"
-  using assms hypermap.faceK hypermap.nodeK skip_edge_def by (smt (z3))
-
-lemma skip_edge_permutes:
-  assumes "hypermap h"
-  shows "skip_edge z h permutes darts h - {z}"
+lemma skip_edge_permutes: "skip_edge z H permutes darts H - {z}"
   unfolding permutes_def
 proof
-  have "\<And>x. x \<notin> darts h - {z} \<Longrightarrow> skip_edge z h x = x"
+  have "\<And>x. x \<notin> darts H - {z} \<Longrightarrow> skip_edge z H x = x"
   proof -
-    fix x assume "x \<notin> darts h - {z}"
-    then have disj: "x \<notin> darts h \<or> x = z" by simp
-    have "x = z \<Longrightarrow> skip_edge z h x = x" by (simp add: skip_edge_id)
-    also have "x \<notin> darts h \<Longrightarrow> skip_edge z h x = x"
-      by (metis Permutations.permutes_not_in assms hypermap.perm_edge hypermap.perm_face skip_edge_def)
-    ultimately show "skip_edge z h x = x"
+    fix x assume "x \<notin> darts H - {z}"
+    then have disj: "x \<notin> darts H \<or> x = z" by simp
+    have "x = z \<Longrightarrow> skip_edge z H x = x" by (simp add: skip_edge_id)
+    also have "x \<notin> darts H \<Longrightarrow> skip_edge z H x = x"
+      by (metis Permutations.permutes_not_in perm_edge perm_face skip_edge_def)
+    ultimately show "skip_edge z H x = x"
       using disj by linarith
     qed
-    then show "\<forall>x. x \<notin> darts h - {z} \<longrightarrow> skip_edge z h x = x" by simp
+    then show "\<forall>x. x \<notin> darts H - {z} \<longrightarrow> skip_edge z H x = x" by simp
 next
-  show "\<forall>y. \<exists>!x. skip_edge z h x = y"
-    by (metis assms skip_edge_Perm UNIV_I bij_apply bij_imp_permutes permutes_univ)
+  show "\<forall>y. \<exists>!x. skip_edge z H x = y"
+    by (metis skip_edge_Perm UNIV_I bij_apply bij_imp_permutes permutes_univ)
 qed
 
+text "Degenerate case for walkup where one of the permutations is an identity on z"
+lemma glink_skip_edge:
+  assumes "z\<rightarrow>\<^bsub>glink H\<^esub>z"
+  shows "skip_edge z H = skip z (edge H)"
+proof
+  fix x
+  from assms have z_eq: "z = edge H z \<or> z = node H z \<or> z = face H z"
+    unfolding glink_def cedge_def cnode_def cface_def by (metis Gr_eq pair_union_arcs_disj)
+  have "z = edge H z \<Longrightarrow> skip_edge z H x = skip z (edge H) x"
+    by (simp add: skip_def skip_edge_def)
+  also have "z = node H z \<Longrightarrow> skip_edge z H x = skip z (edge H) x"
+    unfolding skip_edge_def skip_def using assms nodeK by fastforce
+  moreover have "z = face H z \<Longrightarrow> skip_edge z H x = skip z (edge H) x"
+    unfolding skip_edge_def skip_def using assms faceK by auto
+  ultimately show "skip_edge z H x = skip z (edge H) x"
+    using z_eq by blast
+qed
+
+definition cross_edge where
+"cross_edge h z \<equiv> z\<rightarrow>\<^sup>*\<^bsub>cedge h\<^esub>(node h z)"
+
+definition cross_edge_alt where
+"cross_edge_alt h z \<equiv> z\<rightarrow>\<^sup>*\<^bsub>cedge h\<^esub>(hypermap.node_inv h z)"
+
+lemma cross_edge_split:
+  assumes "\<not> cross_edge_alt H z" "\<not> z\<rightarrow>\<^bsub>glink H\<^esub>z" "z \<in> darts H"
+  shows "edge H z \<in> set_cycle (perm_orbit (Perm (skip_edge z H)) (node_inv H z))"
+  using assms oops
 
 definition walkupE :: "'a pre_hypermap \<Rightarrow> 'a \<Rightarrow> 'a pre_hypermap" where
 "walkupE h z = 
@@ -138,22 +134,21 @@ definition walkupE :: "'a pre_hypermap \<Rightarrow> 'a \<Rightarrow> 'a pre_hyp
    node = Perm (skip z (node h)),
    face = Perm (skip z (face h))\<rparr>"
 
-lemma hypermap_walkupE:
-  assumes "hypermap h"
-  shows "hypermap (walkupE h z)" (is "hypermap ?E")
+theorem hypermap_walkupE:
+  shows "hypermap (walkupE H z)" (is "hypermap ?E")
 proof
-  have "finite (darts h)" using assms hypermap.finite_darts by auto
-  also have "(darts ?E) = (darts h) - {z}"
+  have "finite (darts H)" by (rule finite_darts)
+  also have "(darts ?E) = (darts H) - {z}"
     by (simp add: walkupE_def)
   ultimately show "finite (darts ?E)" by auto
-  show "edge (walkupE h z) permutes darts (walkupE h z)"
-    by (simp add: assms hypermap.perm_node skip_edge_Perm walkupE_def skip_edge_permutes)
-  show "(node (walkupE h z)) permutes darts (walkupE h z)"
-    by (simp add: assms hypermap.perm_node skip_perm skip_permutes walkupE_def)
-  show "(face (walkupE h z)) permutes darts (walkupE h z)"
-    by (simp add: assms hypermap.perm_face skip_perm skip_permutes walkupE_def)
+  show "edge (walkupE H z) permutes darts (walkupE H z)"
+    by (simp add: finite_darts hypermap_axioms permutes_perm skip_edge_permutes walkupE_def)
+  show "(node (walkupE H z)) permutes darts (walkupE H z)"
+    by (simp add: perm_node skip_perm skip_permutes walkupE_def)
+  show "(face (walkupE H z)) permutes darts (walkupE H z)"
+    by (simp add: perm_face skip_perm skip_permutes walkupE_def)
 next
-  fix x have "skip_edge z h (skip z (node h) (skip z (face h) x)) = x"
+  fix x have "skip_edge z H (skip z (node H) (skip z (face H) x)) = x"
   proof (cases "x = z")
     case True
     then show ?thesis
@@ -161,10 +156,48 @@ next
   next
     case False
     then show ?thesis
-      by (smt (z3) apply_inj_eq_iff assms hypermap.faceK skip_def skip_edge_def)
+      by (smt (z3) apply_inj_eq_iff faceK skip_def skip_edge_def)
   qed
-  then show "(edge (walkupE h z)) \<langle>$\<rangle> (node (walkupE h z)) \<langle>$\<rangle> (face (walkupE h z)) \<langle>$\<rangle> x = x"
-    by (simp add: skip_perm walkupE_def assms skip_edge_Perm)
+  then show "(edge (walkupE H z)) \<langle>$\<rangle> (node (walkupE H z)) \<langle>$\<rangle> (face (walkupE H z)) \<langle>$\<rangle> x = x"
+    by (simp add: hypermap_axioms skip_perm walkupE_def skip_edge_Perm)
 qed
 
+
+text \<open>(From fourcolour.walkup.v)
+ cross_edge z <=> z and node z are on the same edge cycle. This edge cycle 
+                 will be split in two in WalkupE z if z is not degenerate,
+                 i.e., ~~ glink z z. Conversely, if cross_edge z does not
+                 hold or if z if degenerate, the genus and hence the Euler
+                 planarity condition are invariant.
+\<close>
+
+text \<open>cross_edge does not hold, so the edge cycles are merged and edge z is in the same edge cycle
+      as node z\<close>
+lemma not_cross_edge_walkup:
+  assumes "z \<in> darts H" "\<not> cross_edge H z" "\<not> z\<rightarrow>\<^bsub>glink H\<^esub>z"
+  shows "edge H z\<rightarrow>\<^sup>*\<^bsub>cedge (walkupE H z)\<^esub>node H z"
+  by (smt (verit, ccfv_threshold) assms Gr_eq Gr_wf apply_perm_image arc_in_union cedge_def
+      cross_edge_def darts_face edgeK fst_conv glink_def hypermap.cedge_reachable_sym
+      hypermap.perm_edge hypermap_axioms hypermap_walkupE imageE insert_Diff insert_iff
+      pair_wf_digraph.arc_fst_in_verts permutes_in_image pre_hypermap.select_convs(1)
+      pre_hypermap.select_convs(2) reachable_def rtrancl_on.simps skip_edge_Perm skip_edge_def
+      walkupE_def wf_digraph.reachable_adjI wf_digraph_wp_iff with_proj_simps(1) with_proj_simps(3))
+
+text \<open>cross_edge does not hold, so the edge cycle is split\<close>
+lemma cross_edge_walkup:
+  assumes "z \<in> darts H" "cross_edge H z" "\<not> z\<rightarrow>\<^bsub>glink H\<^esub>z"
+  shows "\<not>face H z\<rightarrow>\<^sup>*\<^bsub>cedge (walkupE H z)\<^esub>node H z"
+  oops
+
+lemma le_genus_walkupE:
+  assumes "z \<in> darts H"
+  shows "genus (walkupE H z) \<le> genus H"
+  oops
+
+lemma Jordan_WalkupE:
+  assumes "z \<in> darts H"
+  shows "jordan H \<Longrightarrow> jordan (walkupE H z)"
+  oops
+
+end
 end
