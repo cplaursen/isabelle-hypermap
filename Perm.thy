@@ -3274,7 +3274,8 @@ next
   have eq: "{p. set_perm p \<subseteq> A \<and> card {x \<in> A. p \<langle>$\<rangle> x = x} + card (cycles_of_perm p) = 0} = {}"
     using finite_cycles_of_perm \<open>A \<noteq> {}\<close> 3 by (auto simp: card_eq_0_iff)
   thus ?case using 3
-    unfolding count_cycles_on_def eq by simp
+    unfolding count_cycles_on_def eq
+    by (metis (mono_tags, lifting) Collect_empty_eq \<open>A \<noteq> {}\<close> card.infinite card_0_eq size_eq_0_iff_empty size_perm_type_on stirling.simps(3) sum_mset.empty)
 next
   case (4 n k A)
   from 4 have "A \<noteq> {}" by auto
