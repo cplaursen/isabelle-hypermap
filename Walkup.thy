@@ -1,8 +1,8 @@
 theory Walkup
   imports Hypermap
-begin         
+begin
 
-context hypermap begin
+section \<open>Skip edge\<close>
 text \<open>Special case for triangular identity - either merge two cycles or split a cycle
          - If z and node z are on different e cycles walkupE merges them
          - Otherwise, walkupE splits this cycle\<close>
@@ -13,9 +13,74 @@ definition skip_edge where
                   (if (face h (edge h x)) = z then edge h z else
                   (if edge h x = z then edge h (node h z) else edge h x)))"
 
-lemma skip_edge_id: "skip_edge z h z = z"
+text \<open>This definition follows Stahl's 1983 paper, with P and Q swapped\<close>
+definition skip_edge_alt where
+"skip_edge_alt z h x \<equiv>
+ skip z (edge h * cycle_perm (cycle_of_list [z, node h (face h z), node h z])) x"
+
+lemma (in hypermap) skip_edge_altdef:
+  assumes "node H z \<noteq> z"
+  shows "skip_edge z H = skip_edge_alt z H" (is "?L = ?R")
+proof
+  fix x consider
+    (id) "x = z"
+    | (edge_z) "x \<noteq> z \<and> (edge H z) = z" 
+    | (face_edge)"x \<noteq> z \<and> (edge H z) \<noteq> z \<and> face H (edge H x) = z" 
+    | (edge_x) "x \<noteq> z \<and> (edge H z) \<noteq> z \<and> face H (edge H x) \<noteq> z \<and> edge H x = z" 
+    | (no_match) "x \<noteq> z \<and> (edge H z) \<noteq> z \<and> face H (edge H x) \<noteq> z \<and> edge H x \<noteq> z"
+    by auto
+  then show "?L x = ?R x"
+proof cases
+  case id then show ?thesis
+    by (simp add: skip_edge_def skip_edge_alt_def)
+next
+  case edge_z
+  then have "?L x = edge H x" by (metis skip_edge_def)
+  also have "?R x = edge H x"
+    by (metis skip_z_eq_fz cycle_of_list_not_distinct cycle_perm_id distinct_length_2_or_more
+        edge_z mult.right_neutral nodeK skip_edge_alt_def)
+  finally show ?thesis by simp
+next
+  case face_edge then show ?thesis
+    by (smt (verit, ccfv_threshold) apply_inj_eq_iff apply_perm_sequence apply_perm_swap(2)
+ cycle_of_list_not_distinct cycle_perm_cycle_of_list_doubleton cycle_perm_id skip_edge_alt_def
+ cycle_perm_of_list_Cons_Cons distinct_length_2_or_more edgeK mult.right_neutral skip_def skip_edge_def)
+next
+  case edge_x
+  then have "skip_edge z H x = edge H (node H z)"
+    by (metis skip_edge_def)
+  moreover {
+    from edge_x have "edge H x = z" by simp
+    then have "x = node H (face H z)"
+      using nodeK by force
+    then have "(cycle_perm (cycle_of_list [z, node H (face H z), node H z])) x = node H z"
+      using assms edge_x by force
+    hence "?R x = edge H (node H z)"
+      by (metis \<open>x = (node H) \<langle>$\<rangle> (face H) \<langle>$\<rangle> z\<close> apply_inj_eq_iff 
+          apply_perm_sequence edge_x skip_invariant skip_edge_alt_def)
+  }
+  ultimately show ?thesis by simp
+next
+  case no_match 
+  then have "?L x = edge H x" by (metis skip_edge_def)
+  also 
+  { have "cycle_perm (cycle_of_list [z, node H (face H z), node H z]) x = x"
+      by (smt (verit, ccfv_SIG) apply_cycle_of_list apply_perm_cycle apply_perm_swap(3)
+          cycle_lookup_hd cycle_perm_cycle_of_list_doubleton cycle_perm_same_iff
+          distinct_length_2_or_more hypermap.edgeK hypermap.faceK hypermap_axioms insert_iff
+          list.simps(15) no_match perm_eq_iff set_cycle_code)
+    then have "?R x = edge H x" unfolding skip_edge_alt_def
+      by (simp add: apply_perm_times no_match skip_def)
+  }
+  finally show ?thesis by simp
+qed
+qed
+
+lemma skip_edge_id [simp]: "skip_edge z h z = z"
   unfolding skip_edge_def by simp
 
+context hypermap 
+begin
 lemma skip_edge_Perm: "(\<langle>$\<rangle>) (Perm (skip_edge z H)) = skip_edge z H"
 proof
   obtain A where "A = darts H" by auto
