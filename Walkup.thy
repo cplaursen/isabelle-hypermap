@@ -104,7 +104,7 @@ proof
   proof -
     fix x assume "x \<notin> darts H - {z}"
     then have disj: "x \<notin> darts H \<or> x = z" by simp
-    have "x = z \<Longrightarrow> skip_edge z H x = x" by (simp add: skip_edge_id)
+    have "x = z \<Longrightarrow> skip_edge z H x = x" by simp
     also have "x \<notin> darts H \<Longrightarrow> skip_edge z H x = x"
       by (metis Permutations.permutes_not_in perm_edge perm_face skip_edge_def)
     ultimately show "skip_edge z H x = x"
@@ -115,9 +115,32 @@ next
   show "\<forall>y. \<exists>!x. skip_edge z H x = y"
     by (metis skip_edge_Perm UNIV_I bij_apply bij_imp_permutes permutes_univ)
 qed
+end
+
+locale not_degenerate_walkup = hypermap +
+  fixes z assumes "z \<in> darts H" "\<not>z\<rightarrow>\<^bsub>glink H\<^esub>z"
+begin
+
+lemma skip_edge_edge: "skip_edge z H (node H (face H z)) = (edge H (node H z))"
+  unfolding skip_edge_def
+  by (metis Gr_eq cedge_def cface_def edgeK glink_def not_degenerate_walkup.axioms(2) 
+      not_degenerate_walkup_axioms not_degenerate_walkup_axioms_def pair_union_arcs_disj)
+
+lemma skip_edge_node: "skip_edge z H (node H z) = (edge H z)"
+  unfolding skip_edge_def
+  by (metis Gr_eq cnode_def edgeK faceK glink_def not_degenerate_walkup.axioms(2) 
+      not_degenerate_walkup_axioms not_degenerate_walkup_axioms_def pair_union_arcs_disj
+      skip_edge_def skip_edge_edge)
+
+lemma skip_edge_invariant:
+  fixes x
+  assumes "x \<noteq> z" "face H (edge H x) \<noteq> z" "edge H x \<noteq> z"
+  shows "skip_edge z H x = edge H x"
+  unfolding skip_edge_def using assms by auto
+end
 
 text "Degenerate case for walkup where one of the permutations is an identity on z"
-lemma glink_skip_edge:
+lemma (in hypermap) glink_skip_edge:
   assumes "z\<rightarrow>\<^bsub>glink H\<^esub>z"
   shows "skip_edge z H = skip z (edge H)"
 proof
@@ -134,25 +157,16 @@ proof
     using z_eq by blast
 qed
 
-definition cross_edge where
-"cross_edge h z \<equiv> z\<rightarrow>\<^sup>*\<^bsub>cedge h\<^esub>(node h z)"
-
-definition cross_edge_alt where
-"cross_edge_alt h z \<equiv> z\<rightarrow>\<^sup>*\<^bsub>cedge h\<^esub>(hypermap.node_inv h z)"
-
-lemma cross_edge_split:
-  assumes "\<not> cross_edge_alt H z" "\<not> z\<rightarrow>\<^bsub>glink H\<^esub>z" "z \<in> darts H"
-  shows "edge H z \<in> set_cycle (perm_orbit (Perm (skip_edge z H)) (node_inv H z))"
-  using assms oops
+section \<open>WalkupE\<close>
 
 definition walkupE :: "'a pre_hypermap \<Rightarrow> 'a \<Rightarrow> 'a pre_hypermap" where
 "walkupE h z = 
   \<lparr>darts = darts h - {z},
    edge = Perm (skip_edge z h),
-   node = Perm (skip z (node h)),
-   face = Perm (skip z (face h))\<rparr>"
+   node = skip_perm z (node h),
+   face = skip_perm z (face h)\<rparr>"
 
-theorem hypermap_walkupE:
+theorem (in hypermap) hypermap_walkupE:
   shows "hypermap (walkupE H z)" (is "hypermap ?E")
 proof
   have "finite (darts H)" by (rule finite_darts)
@@ -162,24 +176,23 @@ proof
   show "edge (walkupE H z) permutes darts (walkupE H z)"
     by (simp add: finite_darts hypermap_axioms permutes_perm skip_edge_permutes walkupE_def)
   show "(node (walkupE H z)) permutes darts (walkupE H z)"
-    by (simp add: perm_node skip_perm skip_permutes walkupE_def)
+    by (simp add: walkupE_def apply_skip_perm perm_node skip_permutes)
   show "(face (walkupE H z)) permutes darts (walkupE H z)"
-    by (simp add: perm_face skip_perm skip_permutes walkupE_def)
+    by (simp add: walkupE_def apply_skip_perm perm_face skip_permutes)
 next
   fix x have "skip_edge z H (skip z (node H) (skip z (face H) x)) = x"
   proof (cases "x = z")
     case True
     then show ?thesis
-      by (auto simp add: skip_id skip_edge_id)
+      by simp
   next
     case False
     then show ?thesis
       by (smt (z3) apply_inj_eq_iff faceK skip_def skip_edge_def)
   qed
   then show "(edge (walkupE H z)) \<langle>$\<rangle> (node (walkupE H z)) \<langle>$\<rangle> (face (walkupE H z)) \<langle>$\<rangle> x = x"
-    by (simp add: hypermap_axioms skip_perm walkupE_def skip_edge_Perm)
+    by (simp add: apply_skip_perm skip_edge_Perm walkupE_def)
 qed
-
 
 text \<open>(From fourcolour.walkup.v)
  cross_edge z <=> z and node z are on the same edge cycle. This edge cycle 
@@ -189,24 +202,78 @@ text \<open>(From fourcolour.walkup.v)
                  planarity condition are invariant.
 \<close>
 
+definition cross_edge where
+"cross_edge h z \<equiv> z\<rightarrow>\<^sup>*\<^bsub>cedge h\<^esub>node h z"
+
+lemma (in hypermap) cross_edge_path_edge:
+  "cross_edge H z \<longleftrightarrow> edge H z\<rightarrow>\<^sup>*\<^bsub>cedge H\<^esub>node H z" (is "?L = ?R")
+proof
+  assume ?L show ?R
+  proof (rule wf_digraph.reachable_trans)
+    show "wf_digraph (cedge H)"
+      by (simp add: wf_cedge wf_digraph_wp_iff)
+    then show "(edge H) \<langle>$\<rangle> z \<rightarrow>\<^sup>*\<^bsub>with_proj (cedge H)\<^esub> z"
+      by (metis (no_types, lifting) \<open>cross_edge H z\<close> Gr_eq Permutations.permutes_not_in cedge_def
+          hypermap.cedge_reachable_sym cross_edge_def hypermap_axioms perm_edge
+          reach_sym_arc wf_digraph.reachable_in_verts(1) wf_digraph.reachable_refl)
+    show "z \<rightarrow>\<^sup>*\<^bsub>with_proj (cedge H)\<^esub> (node H) \<langle>$\<rangle> z"
+      using \<open>cross_edge H z\<close> unfolding cross_edge_def by simp
+  qed
+next
+  assume ?R show ?L
+    by (metis Gr_eq Permutations.permutes_not_in cedge_def cross_edge_def
+        \<open>(edge H) \<langle>$\<rangle> z \<rightarrow>\<^sup>*\<^bsub>with_proj (cedge H)\<^esub> (node H) \<langle>$\<rangle> z\<close> perm_edge wf_cedge 
+        wf_digraph.adj_reachable_trans wf_digraph_wp_iff)
+qed
+
 text \<open>cross_edge does not hold, so the edge cycles are merged and edge z is in the same edge cycle
       as node z\<close>
-lemma not_cross_edge_walkup:
-  assumes "z \<in> darts H" "\<not> cross_edge H z" "\<not> z\<rightarrow>\<^bsub>glink H\<^esub>z"
-  shows "edge H z\<rightarrow>\<^sup>*\<^bsub>cedge (walkupE H z)\<^esub>node H z"
-  by (smt (verit, ccfv_threshold) assms Gr_eq Gr_wf apply_perm_image arc_in_union cedge_def
-      cross_edge_def darts_face edgeK fst_conv glink_def hypermap.cedge_reachable_sym
-      hypermap.perm_edge hypermap_axioms hypermap_walkupE imageE insert_Diff insert_iff
-      pair_wf_digraph.arc_fst_in_verts permutes_in_image pre_hypermap.select_convs(1)
-      pre_hypermap.select_convs(2) reachable_def rtrancl_on.simps skip_edge_Perm skip_edge_def
-      walkupE_def wf_digraph.reachable_adjI wf_digraph_wp_iff with_proj_simps(1) with_proj_simps(3))
+context not_degenerate_walkup begin
 
-text \<open>cross_edge does not hold, so the edge cycle is split\<close>
-lemma cross_edge_walkup:
-  assumes "z \<in> darts H" "cross_edge H z" "\<not> z\<rightarrow>\<^bsub>glink H\<^esub>z"
-  shows "\<not>face H z\<rightarrow>\<^sup>*\<^bsub>cedge (walkupE H z)\<^esub>node H z"
+lemma walkup_node_cycles:
+  defines "H' \<equiv> walkupE H z"
+  shows "count_cycles_on (darts H) (node H) = count_cycles_on (darts H') (node H')"
+proof -
+  have "count_cycles_on (darts H) (node H) = count_cycles_on (darts H - {z}) (skip_perm z (node H))"
+    sorry
+  then show ?thesis
+    by (simp add: assms walkupE_def)
+qed
+
+lemma walkup_face_cycles:
+  assumes "\<not> cross_edge H z" "H' = walkupE H z"
+  shows "count_cycles_on (darts H) (face H) = count_cycles_on (darts H') (face H')"
   oops
 
+lemma merge_walkup_path:
+  assumes "\<not> cross_edge H z"
+  shows "edge H z\<rightarrow>\<^sup>*\<^bsub>cedge (walkupE H z)\<^esub>node H z"
+  by (smt (z3) Gr_eq Permutations.permutes_not_in assms cedge_def cross_edge_def
+      hypermap.cedge_reachable_sym hypermap.skip_edge_permutes hypermap.wf_cedge hypermap_axioms
+      hypermap_walkupE not_degenerate_walkup.axioms(2) not_degenerate_walkup_axioms
+      not_degenerate_walkup_axioms_def pre_hypermap.select_convs(1) pre_hypermap.select_convs(2) 
+      reach_sym_arc skip_edge_Perm skip_edge_node walkupE_def wf_digraph_wp_iff)
+
+lemma merge_walkup_edge_cycles:
+  assumes "\<not> cross_edge H z" "H' = walkupE H z"
+  shows "count_cycles_on (darts H) (edge H) = count_cycles_on (darts H') (edge H') + 1"
+  sorry
+
+lemma not_cross_edge_euler_lhs:
+  assumes "\<not> cross_edge H z"
+  shows "euler_rhs H = euler_rhs (walkupE H z) + 1"
+
+text \<open>cross_edge does not hold, so the edge cycle is split\<close>
+lemma (in not_degenerate_walkup) cross_edge_walkup:
+  assumes "cross_edge H z"
+  shows "\<not>edge H z\<rightarrow>\<^sup>*\<^bsub>cedge (walkupE H z)\<^esub>node H (face H z)"
+  sorry
+(* by (metis assms Gr_eq apply_inj_eq_iff apply_skip_perm arc_in_union cedge_def cface_def cnode_def
+      glink_def perm.apply_perm_inverse perm_eq_iff pre_hypermap.select_convs(2) skip_edge_Perm 
+      skip_id walkupE_def with_proj_simps(3))*)
+
+
+section \<open>Jordan and Euler\<close>
 lemma le_genus_walkupE:
   assumes "z \<in> darts H"
   shows "genus (walkupE H z) \<le> genus H"
