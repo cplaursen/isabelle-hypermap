@@ -1,5 +1,5 @@
 theory Walkup
-  imports Hypermap
+  imports Hypermap Skip
 begin
 
 section \<open>Skip edge\<close>
