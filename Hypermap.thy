@@ -28,14 +28,23 @@ lemma nodeK: "\<And>x. node H (face H (edge H x)) = x"
 lemma faceK: "\<And>x. face H (edge H (node H x)) = x"
   by (meson apply_inj_eq_iff nodeK)
 
+lemma finite_perm_on_edge: "finite_perm_on (edge H) (darts H)"
+  by (simp add: finite_darts finite_perm_on_axioms.intro finite_perm_on_def perm_edge perm_on.intro)
+
+lemma finite_perm_on_node: "finite_perm_on (node H) (darts H)"
+  by (simp add: finite_darts finite_perm_on_axioms.intro finite_perm_on_def perm_node perm_on.intro)
+
+lemma finite_perm_on_face: "finite_perm_on (face H) (darts H)"
+  by (simp add: finite_darts finite_perm_on_axioms.intro finite_perm_on_def perm_face perm_on.intro)
+  
 lemma darts_edge: "set_perm (edge H) \<subseteq> darts H"
-  by (simp add: perm_edge set_perm_subset)
+  by (simp add: perm_edge perm_on.intro perm_on.set_perm_subset)
 
 lemma darts_node: "set_perm (node H) \<subseteq> darts H"
-  by (simp add: perm_node set_perm_subset)
+  by (simp add: perm_node perm_on.intro perm_on.set_perm_subset)
 
 lemma darts_face: "set_perm (face H) \<subseteq> darts H"
-  by (simp add: perm_face set_perm_subset)
+  by (simp add: perm_face perm_on.intro perm_on.set_perm_subset)
 
 lemma edge_inv: "inv (edge H) = node H * face H"
   by (metis apply_perm_sequence inverse_perm.rep_eq nodeK perm_edge perm_eqI
@@ -77,13 +86,13 @@ lemma (in hypermap) glink_wf: "pair_wf_digraph (glink H)"
 
 context hypermap begin
 lemma cedge_reachable_sym: "u \<rightarrow>\<^sup>*\<^bsub>cedge H\<^esub>v \<Longrightarrow> v \<rightarrow>\<^sup>*\<^bsub>cedge H\<^esub> u "
-  by (metis cedge_def finite_darts perm_edge perm_on.intro perm_on.perm_reach_sym)
+  by (metis cedge_def perm_edge perm_on.intro perm_on.perm_reach_sym)
 
 lemma cnode_reachable_sym: "u \<rightarrow>\<^sup>*\<^bsub>cnode H\<^esub>v \<Longrightarrow> v \<rightarrow>\<^sup>*\<^bsub>cnode H\<^esub> u "
-  by (metis cnode_def finite_darts perm_node perm_on.intro perm_on.perm_reach_sym)
+  by (metis cnode_def perm_node perm_on.intro perm_on.perm_reach_sym)
 
 lemma cface_reachable_sym: "u \<rightarrow>\<^sup>*\<^bsub>cface H\<^esub>v \<Longrightarrow> v \<rightarrow>\<^sup>*\<^bsub>cface H\<^esub> u "
-  by (metis cface_def finite_darts perm_face perm_on.intro perm_on.perm_reach_sym)
+  by (metis cface_def perm_face perm_on.intro perm_on.perm_reach_sym)
 
 
 lemma glink_reachable_sym: "u \<rightarrow>\<^sup>*\<^bsub>glink H\<^esub>v \<Longrightarrow> v \<rightarrow>\<^sup>*\<^bsub>glink H\<^esub> u"
@@ -125,8 +134,37 @@ definition euler_rhs :: "'a pre_hypermap \<Rightarrow> nat" where
                count_cycles_on (darts h) (node h) +
                count_cycles_on (darts h) (face h)"
 
+text \<open>Needed for subtraction on naturals\<close>
+lemma (in hypermap) euler_rhs_ge_3: "darts H \<noteq> {} \<Longrightarrow> euler_rhs H \<ge> 3"
+proof -
+  assume "darts H \<noteq> {}"
+  then have "count_cycles_on (darts H) (edge H) \<noteq> 0"
+            "count_cycles_on (darts H) (node H) \<noteq> 0"
+            "count_cycles_on (darts H) (face H) \<noteq> 0"
+      using finite_perm_on.count_cycles_on_nonempty finite_perm_on_face finite_perm_on_node
+        finite_perm_on_edge by blast+
+    then show "euler_rhs H \<ge> 3"
+      by (smt (verit, del_insts) add_leD2 add_le_same_cancel1 bot_nat_0.extremum_uniqueI
+          euler_rhs_def le_SucE not_less_eq_eq numeral_3_eq_3)
+qed
+
 definition euler_lhs :: "'a pre_hypermap \<Rightarrow> nat" where
 "euler_lhs h = card (pre_digraph.sccs (glink h)) * 2 + card (darts h)"
+
+lemma (in hypermap) euler_lhs_ge_3: "darts H \<noteq> {} \<Longrightarrow> euler_lhs H \<ge> 3"
+proof -
+  interpret glink_gr: pre_digraph "glink H" .
+  assume "darts H \<noteq> {}"
+  then obtain x where "x \<in> darts H" by auto
+  then have "pre_digraph.sccs (glink H) \<noteq> {}"
+    sorry
+  hence "card (pre_digraph.sccs (glink H)) \<ge> 1"
+    using finite_darts sorry
+  also have "card (darts H) \<ge> 1"
+    by (meson \<open>darts H \<noteq> {}\<close> card_eq_0_iff finite_darts less_one not_less)
+  ultimately show ?thesis
+    unfolding euler_lhs_def by linarith
+qed
 
 definition genus where
 "genus h \<equiv> (euler_lhs h - euler_rhs h) div 2"
