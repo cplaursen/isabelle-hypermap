@@ -118,7 +118,9 @@ qed
 end
 
 locale not_degenerate_walkup = hypermap +
-  fixes z assumes "z \<in> darts H" "\<not>z\<rightarrow>\<^bsub>glink H\<^esub>z"
+  fixes z
+  assumes z_dart: "z \<in> darts H"
+      and z_not_glink: "\<not>z\<rightarrow>\<^bsub>glink H\<^esub>z"
 begin
 
 lemma skip_edge_edge: "skip_edge z H (node H (face H z)) = (edge H (node H z))"
@@ -226,25 +228,101 @@ next
         wf_digraph.adj_reachable_trans wf_digraph_wp_iff)
 qed
 
-text \<open>cross_edge does not hold, so the edge cycles are merged and edge z is in the same edge cycle
-      as node z\<close>
+locale degenerate_walkup = hypermap +
+  fixes z
+  assumes z_glink: "z\<rightarrow>\<^bsub>glink H\<^esub> z"
+begin
+
+lemma z_dart: "z \<in> darts H"
+  by (metis z_glink Gr_eq cedge_def cface_def cnode_def glink_def pair_union_arcs_disj)
+
+lemma degenerate_euler:
+  defines "H' \<equiv> walkupE H z"
+  shows "euler_lhs H - euler_lhs H' = euler_rhs H - euler_rhs H'"
+proof (cases "edge H z = z \<and> node H z = z \<and> face H z = z")
+interpret face_perm_on: finite_perm_on "face H" "darts H"
+  by (rule finite_perm_on_face)
+interpret node_perm_on: finite_perm_on "node H" "darts H"
+  by (rule finite_perm_on_node)
+interpret edge_perm_on: finite_perm_on "edge H" "darts H"
+  by (rule finite_perm_on_edge)
+  case True
+  have "euler_rhs H' = euler_rhs H - 3"
+  proof -
+    have "count_cycles_on (darts H) (node H) = count_cycles_on (darts H') (node H') + 1"
+        by (metis True assms node_perm_on.cycle_count_skip_singleton finite_darts
+            pre_hypermap.select_convs(1) pre_hypermap.select_convs(3) walkupE_def z_dart)
+    also have "count_cycles_on (darts H) (face H) = count_cycles_on (darts H') (face H') + 1"
+        by (metis True assms face_perm_on.cycle_count_skip_singleton finite_darts
+            pre_hypermap.select_convs(1) pre_hypermap.select_convs(4) walkupE_def z_dart)
+    moreover have "count_cycles_on (darts H) (edge H) = count_cycles_on (darts H') (edge H') + 1"
+      by (metis True apply_skip_perm assms finite_darts glink_skip_edge perm.apply_perm_inverse
+          perm_edge perm_on.cycle_count_skip_singleton perm_on.intro pre_hypermap.select_convs(1)
+          pre_hypermap.select_convs(2) walkupE_def z_glink z_dart)
+    ultimately show ?thesis
+      by (simp add: euler_rhs_def)
+  qed
+  also have "euler_lhs H' = euler_lhs H - 3"
+  proof -
+    have dart_count: "card (darts H') = card (darts H) - 1"
+      by (simp add: assms node_perm_on.finite_S walkupE_def z_dart)
+    have "card (pre_digraph.sccs (glink H')) = card (pre_digraph.sccs (glink H)) - 1"
+      sorry
+    then have "card (darts H') + 2 * (card (pre_digraph.sccs (glink H'))) =
+             card (darts H) - 1 + 2 * (card (pre_digraph.sccs (glink H)) - 1)"
+      using dart_count by presburger
+    hence "card (darts H') + 2 * card (pre_digraph.sccs (glink H')) =
+            card (darts H) + 2 * card (pre_digraph.sccs (glink H)) - 3"
+      try0
+    then show ?thesis
+      using euler_lhs_def sledgehammer
+         sorry
+  ultimately show ?thesis
+    by (metis diff_diff_cancel empty_iff euler_lhs_ge_3 euler_rhs_ge_3 z_dart)
+next
+  case False
+  then show ?thesis sorry
+qed
+end
+
 context not_degenerate_walkup begin
 
-lemma walkup_node_cycles:
+lemma walkup_node_cycle_count:
   defines "H' \<equiv> walkupE H z"
   shows "count_cycles_on (darts H) (node H) = count_cycles_on (darts H') (node H')"
 proof -
-  have "count_cycles_on (darts H) (node H) = count_cycles_on (darts H - {z}) (skip_perm z (node H))"
-    sorry
+  interpret perm_on "(node H)" "(darts H)"
+    using perm_node perm_on.intro by blast
+  have "count_cycles_on (darts H) (node H) =
+        count_cycles_on (darts H - {z}) (skip_perm z (node H))"
+    apply (rule cycle_count_skip)
+      apply (simp_all add: z_dart finite_darts)
+      apply (metis z_not_glink Gr_eq arc_in_union cedge_def glink_def
+            skip_edge_id skip_edge_node z_dart)
+    done
   then show ?thesis
     by (simp add: assms walkupE_def)
 qed
 
-lemma walkup_face_cycles:
-  assumes "\<not> cross_edge H z" "H' = walkupE H z"
+lemma walkup_face_cycle_count:
+  defines "H' \<equiv> walkupE H z"
   shows "count_cycles_on (darts H) (face H) = count_cycles_on (darts H') (face H')"
-  oops
+proof -
+  interpret perm_on "(face H)" "(darts H)"
+    using perm_face perm_on.intro by blast
+  have "count_cycles_on (darts H) (face H) =
+        count_cycles_on (darts H - {z}) (skip_perm z (face H))"
+    apply (rule cycle_count_skip)
+      apply (simp_all add: z_dart finite_darts)
+      apply (metis Gr_eq arc_in_union cedge_def edgeK glink_def
+            skip_edge_edge skip_edge_node z_dart z_not_glink)
+    done
+  then show ?thesis
+    by (simp add: assms walkupE_def)
+qed
 
+text \<open>cross_edge does not hold, so the edge cycles are merged and edge z is in the same edge cycle
+      as node z\<close>
 lemma merge_walkup_path:
   assumes "\<not> cross_edge H z"
   shows "edge H z\<rightarrow>\<^sup>*\<^bsub>cedge (walkupE H z)\<^esub>node H z"
@@ -255,22 +333,49 @@ lemma merge_walkup_path:
       reach_sym_arc skip_edge_Perm skip_edge_node walkupE_def wf_digraph_wp_iff)
 
 lemma merge_walkup_edge_cycles:
-  assumes "\<not> cross_edge H z" "H' = walkupE H z"
+  assumes  "\<not> cross_edge H z"
+  defines "H' \<equiv> walkupE H z"
   shows "count_cycles_on (darts H) (edge H) = count_cycles_on (darts H') (edge H') + 1"
-  sorry
+ sorry
 
 lemma not_cross_edge_euler_lhs:
   assumes "\<not> cross_edge H z"
-  shows "euler_rhs H = euler_rhs (walkupE H z) + 1"
+  defines "H' \<equiv> walkupE H z"
+  shows "euler_rhs H = euler_rhs H' + 1"
+proof -
+  have "count_cycles_on (darts H) (face H) = count_cycles_on (darts H') (face H')"
+    by (simp add: assms walkup_face_cycle_count)
+  also have "count_cycles_on (darts H) (node H) = count_cycles_on (darts H') (node H')"
+    by (simp add: assms walkup_node_cycle_count)
+  moreover have "count_cycles_on (darts H) (edge H) = count_cycles_on (darts H') (edge H') + 1"
+    by (simp add: assms merge_walkup_edge_cycles)
+  ultimately show ?thesis
+    unfolding euler_rhs_def by simp
+qed
+
+lemma cross_edge_euler_rhs:
+  assumes "cross_edge H z"
+  defines "H' \<equiv> walkupE H z"
+  shows "euler_rhs H = euler_rhs H' + 3"
+proof -
+  have "count_cycles_on (darts H) (face H) = count_cycles_on (darts H') (face H')"
+    by (simp add: assms walkup_face_cycle_count)
+  also have "count_cycles_on (darts H) (node H) = count_cycles_on (darts H') (node H')"
+    by (simp add: assms walkup_node_cycle_count)
+  moreover have "count_cycles_on (darts H) (edge H) = count_cycles_on (darts H') (edge H') + 3"
+    sorry
+  ultimately show ?thesis
+    unfolding euler_rhs_def by simp
+qed
 
 text \<open>cross_edge does not hold, so the edge cycle is split\<close>
 lemma (in not_degenerate_walkup) cross_edge_walkup:
   assumes "cross_edge H z"
   shows "\<not>edge H z\<rightarrow>\<^sup>*\<^bsub>cedge (walkupE H z)\<^esub>node H (face H z)"
-  sorry
-(* by (metis assms Gr_eq apply_inj_eq_iff apply_skip_perm arc_in_union cedge_def cface_def cnode_def
+  (*by (metis assms Gr_eq apply_inj_eq_iff apply_skip_perm arc_in_union cedge_def cface_def cnode_def
       glink_def perm.apply_perm_inverse perm_eq_iff pre_hypermap.select_convs(2) skip_edge_Perm 
       skip_id walkupE_def with_proj_simps(3))*)
+  sorry
 
 
 section \<open>Jordan and Euler\<close>
