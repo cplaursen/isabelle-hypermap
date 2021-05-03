@@ -44,6 +44,10 @@ lemma set_perm_subset:
 lemma count_cycles_on_eq_card:
  "count_cycles_on S p = card (cycles_of_perm p) + card (S - set_perm p)"
   unfolding count_cycles_on_def by (simp add: perm_type_on_def size_perm_type_eq_card)
+
+lemma inverse_permutes: "(inverse p) permutes S"
+  by (smt (verit, del_insts) apply_perm_inverse_not_in_set eq_apply_perm_inverse_iff
+      perm.inverse_inverse permutes_def permutes_subset set_perm_subset)
 end
 
 locale finite_perm_on = perm_on +
@@ -53,20 +57,41 @@ begin
 lemma count_cycles_on_nonempty:
   assumes "S \<noteq> {}" shows "count_cycles_on S p \<noteq> 0"
   by (simp add: assms count_cycles_on_eq_card finite_S finite_cycles_of_perm)
-
 end
 
 
 section \<open>Digraph extras\<close>
+
 lemma reachable1:
   assumes "a \<rightarrow>\<^bsub>G\<^esub> b" "a \<in> verts G" "b \<in> verts G"
   shows "a\<rightarrow>\<^sup>*\<^bsub>G\<^esub>b"
   by (metis assms reachable_def rtrancl_on.simps)
 
-lemma reach_sym_arc:
-  assumes "a \<rightarrow>\<^sup>*\<^bsub>g\<^esub> b \<Longrightarrow> b \<rightarrow>\<^sup>*\<^bsub>g\<^esub> a" "wf_digraph g"
-  shows "a \<rightarrow>\<^bsub>g\<^esub> b \<Longrightarrow> b \<rightarrow>\<^sup>*\<^bsub>g\<^esub> a"
-  by (simp add: assms wf_digraph.reachable_adjI)
+definition (in wf_digraph) "connect_sym \<equiv> (\<forall>a b. a \<rightarrow>\<^sup>* b \<longrightarrow> b \<rightarrow>\<^sup>* a)"
+
+lemma (in wf_digraph) reach_sym_arc:
+  assumes "connect_sym"
+  shows  "a \<rightarrow>\<^bsub>G\<^esub> b \<Longrightarrow> b \<rightarrow>\<^sup>* a"
+  using assms connect_sym_def by blast
+
+lemma arc_to_ends_pair [simp]: "arc_to_ends (with_proj g) e = e"
+  by simp
+
+lemma (in wf_digraph) card_sccs_1: "card sccs = 1 \<Longrightarrow> sccs = {G}"
+  by (smt (verit, del_insts) card_1_singletonE card_sccs_verts empty_iff image_empty
+        in_scc_of_self in_sccs_verts_conv_reachable in_verts_sccsD_sccs induce_eq_iff_induced
+        induced_subgraph_refl scc_of_in_sccs_verts sccs_verts_conv_scc_of singleton_iff 
+        wf_digraph.reachable_in_verts(1) wf_digraph_axioms)
+
+lemma (in wf_digraph) card_sccs_connected: "(card sccs = 1) = strongly_connected G"
+  by (metis One_nat_def card.empty card.insert empty_iff finite.emptyI
+      strongly_connected_eq_iff card_sccs_1)
+
+lemma (in fin_digraph) finite_sccs: "finite sccs"
+  using finite_imageD finite_sccs_verts inj_on_verts_sccs sccs_verts_conv by auto
+
+lemma comm_graph_union: "compatible g h \<Longrightarrow> union g h = union h g"
+  by (simp add: Un_commute compatible_head compatible_tail)
 
 definition pair_union :: "'a pair_pre_digraph \<Rightarrow> 'a pair_pre_digraph \<Rightarrow> 'a pair_pre_digraph" where
 "pair_union g h \<equiv> \<lparr> pverts = pverts g \<union> pverts h, parcs = parcs g \<union> parcs h\<rparr>"
@@ -96,10 +121,8 @@ by (meson assms pre_digraph.reachable_mono rtrancl_subset_rtrancl subgraphs_of_u
 definition reverse :: "'a pair_pre_digraph \<Rightarrow> 'a pair_pre_digraph" ("(_\<^sup>R)" [1000] 999) where
 "reverse a = \<lparr>pverts = pverts a, parcs = (parcs a)\<inverse>\<rparr>"
 
-lemma wf_reverse: "pair_wf_digraph g \<Longrightarrow> pair_wf_digraph (g\<^sup>R)"
-  unfolding reverse_def
-  by (smt (verit, ccfv_SIG) converseE fst_swap pair_pre_digraph.select_convs(1)
-      pair_pre_digraph.select_convs(2) pair_wf_digraph_def swap_simp)
+lemma (in pair_wf_digraph) wf_reverse: "pair_wf_digraph (G\<^sup>R)"
+  unfolding reverse_def by (simp add: in_arcsD1 in_arcsD2 pair_wf_digraph_def)
 
 lemma arc_reverse: "x\<rightarrow>\<^bsub>with_proj g\<^esub>y \<Longrightarrow> y\<rightarrow>\<^bsub>g\<^sup>R\<^esub>x"
   by (simp add: reverse_def)
@@ -107,33 +130,23 @@ lemma arc_reverse: "x\<rightarrow>\<^bsub>with_proj g\<^esub>y \<Longrightarrow>
 lemma reach_reverse: "x\<rightarrow>\<^sup>*\<^bsub>with_proj g\<^esub>y \<Longrightarrow> y\<rightarrow>\<^sup>*\<^bsub>g\<^sup>R\<^esub>x"
   by (simp add: reverse_def reachable_def rtrancl_on_converseI)
 
+lemma (in pre_digraph) "scc_of x \<subseteq> verts G"
+  using pre_digraph.scc_of_def reachable_in_vertsE by fastforce
+
 section \<open>Lemmas about graph union\<close>
+
 locale compatible_digraphs = G: wf_digraph G + H: wf_digraph H
   for G :: "('a, 'b) pre_digraph" and H :: "('a, 'b) pre_digraph" +
   assumes "compatible G H"
 begin
 
-interpretation GH_union: pre_digraph "union G H" .
+interpretation graph_union: pre_digraph "union G H" .
 
-lemma sccs_union: "GH_union.sccs = G.sccs \<union> H.sccs"
-proof (rule subset_antisym; rule subsetI; safe)
-  fix x 
-  {
-    assume *: "x \<in> GH_union.sccs" "x \<notin> H.sccs"
-    show "x \<in> G.sccs"
-    proof (rule G.in_sccsI)
-      from *(1) have in_union_sccs: "induced_subgraph x (union G H)" "strongly_connected x"
-        "\<nexists>c. induced_subgraph c (union G H) \<and> strongly_connected c 
-          \<and> verts x \<subset> verts c"
-        by (auto simp add: GH_union.in_sccsE)
-      then show "strongly_connected x" by simp
-      have "subgraph G (union G H)"
-        using G.wf_digraph_axioms compatible_def in_union_sccs(1) subgraph_def by fastforce
-      then show "\<nexists>c. induced_subgraph c G \<and> strongly_connected c \<and> verts x \<subset> verts c"
-        by (metis in_union_sccs(3) induce_subgraph_verts induced_imp_subgraph subgraph_def 
-            subgraph_trans wf_digraph.induced_induce 
-            wf_digraph.strongly_connected_imp_induce_subgraph_strongly_connected)
-      show "induced_subgraph x G" using * \<open>subgraph G (union G H)\<close> in_union_sccs(1) assms oops
+lemma sccs_union_subgraph: "x \<in> G.sccs \<Longrightarrow> \<exists>x' \<in> graph_union.sccs. subgraph x x'"
+  sorry
+
+lemma sccs_union: "\<exists>S. \<Union>S = G.sccs \<union> H.sccs \<and> G.Union ` S = graph_union.sccs"
+  sorry
 
 end
 end
