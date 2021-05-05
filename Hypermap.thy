@@ -334,6 +334,82 @@ fun moebius_path where
 
 definition "jordan = (\<forall>p. \<not> (moebius_path p))"
 end
+end
+
+section \<open>Dual walkups\<close>
+definition "permN h \<equiv> \<lparr>darts = darts h, edge = node h, node = face h, face = edge h\<rparr>"
+
+definition "permF h \<equiv> \<lparr>darts = darts h, edge = face h, node = edge h, face = node h\<rparr>"
+
+context hypermap begin
+
+lemma hypermap_permN: "hypermap (permN H)"
+  by (simp add: finite_darts hypermap_def nodeK permN_def perm_edge perm_face perm_node)
+
+lemma permN_connect1_glink: "x\<rightarrow>\<^bsub>glink H\<^esub>y \<longleftrightarrow> x\<rightarrow>\<^bsub>glink (permN H)\<^esub>y"
+  by (metis (no_types, lifting) cedge_def cface_def cnode_def glink_def pair_union_arcs_disj 
+      permN_def pre_hypermap.select_convs(1,2,3,4))
+
+lemma permN_glink: "glink H = glink (permN H)"
+proof -
+  have "verts (glink H) = verts (glink (permN H))"
+    by (simp add: cedge_def cface_def cnode_def glink_def permN_def)
+  also have "arcs (glink H) = arcs (glink (permN H))"
+    apply (simp add: set_eq_iff)
+    using permN_connect1_glink by auto
+  ultimately show ?thesis
+    by simp
+qed
+
+lemma connected_permN: "connected_hypermap \<Longrightarrow> hypermap.connected_hypermap (permN H)"
+  by (simp add: connected_hypermap_def hypermap.connected_hypermap_def hypermap_permN permN_glink)
+
+lemma genus_permN: "genus H = genus (permN H)"
+proof -
+  have "euler_lhs H = euler_lhs (permN H)"
+    by (simp add: euler_lhs_def permN_def permN_glink)
+  moreover have "euler_rhs H = euler_rhs (permN H)"
+    by (simp add: euler_rhs_def permN_def)
+  ultimately show ?thesis
+    by (simp add: genus_def)
+qed
+
+lemma planar_permN: "planar H = planar (permN H)"
+  by (simp add: genus_permN planar_def)
+
+lemma hypermap_permF: "hypermap (permF H)"
+  by (simp add: finite_darts hypermap_def faceK permF_def perm_edge perm_face perm_node)
+
+lemma permF_connect1_glink: "x\<rightarrow>\<^bsub>glink H\<^esub>y \<longleftrightarrow> x\<rightarrow>\<^bsub>glink (permF H)\<^esub>y"
+  by (metis (no_types, lifting) cedge_def cface_def cnode_def glink_def pair_union_arcs_disj 
+      permF_def pre_hypermap.select_convs(1,2,3,4))
+
+lemma permF_glink: "glink H = glink (permF H)"
+proof -
+  have "verts (glink H) = verts (glink (permF H))"
+    by (simp add: cedge_def cface_def cnode_def glink_def permF_def)
+  also have "arcs (glink H) = arcs (glink (permF H))"
+    apply (simp add: set_eq_iff)
+    using permF_connect1_glink by auto
+  ultimately show ?thesis
+    by simp
+qed
+
+lemma connected_permF: "connected_hypermap \<Longrightarrow> hypermap.connected_hypermap (permF H)"
+  by (simp add: connected_hypermap_def hypermap.connected_hypermap_def hypermap_permF permF_glink)
+
+lemma genus_permF: "genus H = genus (permF H)"
+proof -
+  have "euler_lhs H = euler_lhs (permF H)"
+    by (simp add: euler_lhs_def permF_def permF_glink)
+  moreover have "euler_rhs H = euler_rhs (permF H)"
+    by (simp add: euler_rhs_def permF_def)
+  ultimately show ?thesis
+    by (simp add: genus_def)
+qed
+
+lemma planar_permF: "planar H = planar (permF H)"
+  by (simp add: genus_permF planar_def)
 
 
 definition dual :: "'a pre_hypermap" where

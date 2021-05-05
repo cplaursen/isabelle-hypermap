@@ -707,7 +707,7 @@ begin
 definition "n_comp_z disc \<equiv> if z\<rightarrow>\<^bsub>glink H\<^esub>z
                               then (if z_barb then 2 else 1)
                               else (if disc then 0 else 1)"
-                                         
+
 lemma euler_lhs_walkupE: "n_comp_z disconnected * 2 + euler_lhs H' = euler_lhs H + 1"
   apply (auto simp: n_comp_z_def)
   using disconnected_not_glink with_proj_simps(3) apply blast
@@ -749,7 +749,36 @@ lemma even_genus_walkupE: "even (genus H') \<Longrightarrow> even (genus H)"
   sorry
   (*by (smt (verit) euler_lhs_walkupE euler_rhs_walkupE genus_def)*)
 
-lemma Jordan_WalkupE: "jordan H \<Longrightarrow> jordan H'"
+lemma Jordan_WalkupE: "jordan \<Longrightarrow> hypermap.jordan H'"
   sorry
 end
+
+section \<open>Other walkups\<close>
+
+definition "walkupN H z \<equiv> permF (walkupE (permN H) z)"
+
+definition "walkupF H z \<equiv> permN (walkupE (permF H) z)"
+
+lemma (in walkup) planar_walkupN: "planar H \<Longrightarrow> planar (walkupN H z)"
+proof -
+  assume *: "planar H"
+  then have "planar (walkupE (permN H) z)"
+    by (metis hypermap_permN permN_def planar_permN pre_hypermap.select_convs(1) walkup.H'_def
+        walkup.planar_walkupE walkup_axioms.intro walkup_def z_dart)
+  then show ?thesis
+    by (metis hypermap.genus_permF hypermap_permN permN_def planar_def pre_hypermap.select_convs(1)
+        walkup.H'_def walkup.hypermap_walkupE walkup.intro walkupN_def walkup_axioms.intro z_dart)
+qed
+
+lemma (in walkup) planar_walkupF: "planar H \<Longrightarrow> planar (walkupF H z)"
+proof -
+  assume *: "planar H"
+  then have "planar (walkupE (permF H) z)"
+    by (metis hypermap_permF permF_def planar_permF pre_hypermap.select_convs(1) walkup.H'_def
+        walkup.planar_walkupE walkup_axioms.intro walkup_def z_dart)
+  then show ?thesis
+    by (metis hypermap.genus_permN hypermap_permF permF_def planar_def pre_hypermap.select_convs(1)
+        walkup.H'_def walkup.hypermap_walkupE walkup.intro walkupF_def walkup_axioms.intro z_dart)
+qed
+
 end

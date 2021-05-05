@@ -21,15 +21,25 @@ proof (induct "card (darts H)" arbitrary: H)
         h_0.moebius_path.elims(2))
 next
   case (Suc x)
-  then interpret H: hypermap H by simp
+  interpret H: hypermap H
+    by (simp add: Suc.prems(1))
   interpret clink: wf_digraph "clink H"
     by (simp add: H.wf_clink wf_digraph_wp_iff)
   {
     assume "\<not> H.jordan"
     then obtain p where "H.moebius_path p"
       using H.jordan_def by blast
+    then have "length p \<ge> 3"
+      sorry
+(*  1) a dart not in p, with an E-transform                                   *)
+(*  2) x with an E-transform if x is followed by an N-link (i.e., x = node y) *)
+(*  3) y = face x with an F-transform, if y is followed by an N-link.         *)
+(*  4) y with an E-transform, if y != t (by 3), z = face y)                   *)
+(*  5) y with an N-transform, if y != node x                                  *)
+(*  6) z with an E-transform, if z is followed by an F-link in p              *)
+(*  7) z with an F-transform, otherwise (z is followed by an N-link in p)     *)
     then have "\<exists>p' u. u \<in> darts H \<and> hypermap.moebius_path (walkupE H u) p'"
-    proof -
+      sorry
     then obtain u where u: "\<exists>p'. u \<in> darts H \<and> hypermap.moebius_path (walkupE H u) p'"
       by blast
     then interpret walkup: walkup H u
@@ -50,7 +60,7 @@ next
   then show ?case by blast
 qed
 
-theorem Jordan_planar: "jordan H \<Longrightarrow> planar H"
+theorem Jordan_planar: "jordan \<Longrightarrow> planar H"
   sorry
 
 end
