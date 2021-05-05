@@ -1,6 +1,23 @@
 theory Extras
-    imports "Perm" "Graph_Theory.Graph_Theory"
+    imports "Perm" "Graph_Theory.Graph_Theory" "List-Index.List_Index"
 begin
+
+section \<open>Appears before\<close>
+
+definition "appears_before l x y \<equiv> y \<in> set (drop (index l x) l)"
+
+lemma appears_before_in:
+  assumes "appears_before l x y"
+  shows "x \<in> set l" "y \<in> set l"
+   apply (metis appears_before_def assms in_set_dropD index_conv_size_if_notin last_index_drop
+      last_index_less_size_conv)
+  by (meson appears_before_def assms in_set_dropD)
+
+lemma not_appears_before_fst: "x \<notin> set l  \<Longrightarrow> \<not> appears_before l x y"
+  by (meson appears_before_in(1))
+
+lemma not_appears_before_snd: "y \<notin> set l \<Longrightarrow> \<not> appears_before l x y"
+  by (meson appears_before_in(2))
 
 section \<open>Permutations and funpow\<close>
 lemma cycles_funpow:

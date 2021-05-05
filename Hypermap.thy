@@ -1,5 +1,5 @@
 theory Hypermap
-  imports "Fun_Graph"
+  imports "Fun_Graph" 
 begin
 
 section \<open>Hypermap\<close>
@@ -320,17 +320,40 @@ proof -
   then show ?thesis using clink_glink clink.reachable_apath by simp
 qed
 
-definition appears_before :: "'a list \<Rightarrow> 'a \<Rightarrow> 'a \<Rightarrow> bool" where
-"appears_before p x y = (y \<in> set (dropWhile (\<lambda> z. z \<noteq> x) p))"
-
 text \<open>A "Moebius path" is a contour that cannot appear in a planar map, as it goes from the inside
       of a ring to the outside\<close>
 
 fun moebius_path where
   "moebius_path [] = False"
-| "moebius_path p = (\<exists> x y. clink.apath x p y
-                    \<and> (\<exists>n. n\<rightarrow>\<^bsub>cnode H\<^esub>y 
-                    \<and> appears_before (clink.awalk_verts x p) n (node H (clink.awhd x p))))"
+| "moebius_path (_ # []) = False"
+| "moebius_path p = (vpath p (clink H)
+                    \<and> appears_before p (face H (edge H (last p))) (node H (hd p)))"
+
+lemma "moebius_path p \<Longrightarrow> length p \<ge> 3"
+proof (rule ccontr)
+  assume *: "moebius_path p" "\<not> length p \<ge> 3"
+  then consider "length p = 0 \<or> length p = 1" | "length p = 2"
+    by linarith
+  then show "False"
+  proof cases
+    case 1
+    then show ?thesis
+      using *(1) moebius_path.elims(2) by fastforce
+  next
+    case 2
+    then have **: "vpath p (clink H)" "appears_before p (face H (edge H (last p))) (node H (hd p))"
+      using *(1) hypermap.moebius_path.elims hypermap_axioms by blast+
+    then have elems: "face H (edge H (last p)) \<in> set p \<and> node H (hd p) \<in> set p"
+      using appears_before_in by auto
+    from 2 obtain x y where "p = [x,y]"
+      by (metis (no_types, lifting) length_0_conv length_Suc_conv numeral_2_eq_2)
+    then have "x \<noteq> y"
+      by (metis  *(1) vpath_def distinct_length_2_or_more moebius_path.simps(3))
+    then have "face H (edge H y) = y \<and> x = node H x \<or> face H (edge H y) = x \<and> y = node H x"
+      by (metis \<open>p = [x,y]\<close> elems empty_iff empty_set faceK hypermap.nodeK hypermap_axioms last.simps list.distinct(1) list.sel(1) set_ConsD)
+    then show "False" using \<open>x \<noteq> y\<close> node_inv sorry
+  qed
+qed
 
 definition "jordan = (\<forall>p. \<not> (moebius_path p))"
 end

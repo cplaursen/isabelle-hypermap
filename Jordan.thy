@@ -17,8 +17,8 @@ proof (induct "card (darts H)" arbitrary: H)
   case 0
   then interpret h_0: hypermap H by simp
   show ?case
-    by (smt (z3) "0.hyps" Gr_eq card_0_eq cnode_def empty_iff h_0.finite_darts h_0.jordan_def
-        h_0.moebius_path.elims(2))
+    by (smt (z3) "0.hyps" Gr_verts card_eq_0_iff cnode_def emptyE h_0.hypermap_axioms h_0.jordan_def
+        hypermap.finite_darts hypermap.moebius_path.elims(2) reachable_in_vertsE)
 next
   case (Suc x)
   interpret H: hypermap H
