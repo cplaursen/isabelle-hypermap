@@ -1,4 +1,4 @@
-theory Extras
+theory Extras  
     imports "Perm" "Graph_Theory.Graph_Theory" "List-Index.List_Index"
 begin
 
@@ -13,19 +13,67 @@ lemma appears_before_in:
       last_index_less_size_conv)
   by (meson appears_before_def assms in_set_dropD)
 
-lemma not_appears_before_fst: "x \<notin> set l  \<Longrightarrow> \<not> appears_before l x y"
-  by (meson appears_before_in(1))
+lemma appears_before_empty: "\<not> appears_before [] x y"
+  by (metis appears_before_in(1) empty_iff empty_set)
 
-lemma not_appears_before_snd: "y \<notin> set l \<Longrightarrow> \<not> appears_before l x y"
-  by (meson appears_before_in(2))
+lemma not_appears_before_in: "x \<notin> set l \<or> y \<notin> set l \<Longrightarrow> \<not> appears_before l x y"
+  by (meson appears_before_in)
+
+lemma appears_before_id: "appears_before l x x \<longleftrightarrow> x \<in> set l"
+  apply (auto simp add: appears_before_in(1))
+  by (metis Cons_nth_drop_Suc appears_before_def index_less_size_conv list.set_intros(1) nth_index)
+
+lemma appears_before_cons:
+ "appears_before (x#l) y z \<longleftrightarrow>
+  (if x = y then z \<in> set (x#l) else appears_before l y z)"
+  by (simp add: appears_before_def)
+
+lemma appears_before_append: 
+  assumes "appears_before p x y \<or> appears_before q x y \<or> x \<in> set p \<and> y \<in> set q"
+  shows "appears_before (p@q) x y"
+proof -
+  {
+    assume "appears_before p x y"
+    then have "y \<in> set (drop (index p x) p)"
+      by (meson appears_before_def)
+    also have "index p x = index (p@q) x"
+      by (metis \<open>appears_before p x y\<close> appears_before_in(1) index_append)
+    then have "set (drop (index p x) p) \<subseteq> set (drop (index (p@q) x) (p@q))"
+      by simp
+    ultimately have "appears_before (p @ q) x y"
+      by (meson appears_before_def in_mono)
+  } note 1 = this
+  {
+    assume "appears_before q x y"
+    then have "y \<in> set (drop (index q x) q)"
+      by (meson appears_before_def)
+    also have "length p + index q x \<ge> index (p@q) x"
+      by (simp add: index_append index_le_size trans_le_add1)
+    then have "set (drop (index q x) q) \<subseteq> set (drop (index (p@q) x) (p@q))"
+      by (metis add_diff_cancel_left' append_Nil drop_all drop_append 
+          le_add1 set_drop_subset_set_drop)
+    ultimately have ?thesis
+      by (meson appears_before_def subsetD)
+  } note 2 = this
+  {
+    assume "x \<in> set p" "y \<in> set q"
+    then have "set q \<subseteq> set (drop (index (p@q) x) (p@q))"
+      by (simp add: index_append index_le_size)
+    then have ?thesis
+      by (metis \<open>y \<in> set q\<close> appears_before_def subset_iff)
+  } note 3 = this
+  from 1 2 3 assms show ?thesis by auto
+qed
 
 section \<open>Permutations and funpow\<close>
 lemma cycles_funpow:
   assumes "z \<in> set_cycle (perm_orbit p x)"
   shows "\<exists>n. (apply_perm p ^^ n) z = x"
 proof -
-  from assms have "(apply_perm p ^^ n) z \<in> set_cycle (perm_orbit p x)" by simp
-  also have "x \<in> set_cycle (perm_orbit p x)" using assms by fastforce
+  from assms have "(apply_perm p ^^ n) z \<in> set_cycle (perm_orbit p x)" for n
+    by simp
+  also have "x \<in> set_cycle (perm_orbit p x)" 
+    using assms by fastforce
   ultimately show ?thesis
     by (metis apply_perm_power assms funpow_apply_cycle_perm_orbit set_cycle_ex_funpow)
 qed
@@ -33,13 +81,8 @@ qed
 lemma funpow_cycles:
   assumes "(apply_perm p ^^ n) z = x" "z \<noteq> x"
   shows "z \<in> set_cycle (perm_orbit p x)"
-proof (cases "n = 0")
-  case True then show ?thesis using assms by auto
-next
-  case False then show ?thesis
-    by (metis apply_inj_eq_iff apply_perm_power assms funpow_apply_perm_in_perm_orbit_iff
-       id_funpow_id start_in_perm_orbit_iff)
-qed
+  by (metis apply_perm_eq_idI apply_perm_neq_idI apply_perm_power apply_set_perm assms 
+      funpow_apply_perm_in_perm_orbit_iff set_perm_powerD start_in_perm_orbit_iff)
 
 lemma permutes_perm:
   assumes "finite S" "f permutes S"
@@ -48,6 +91,10 @@ lemma permutes_perm:
 
 lemma size_perm_type_eq_card: "size (perm_type p) = card (cycles_of_perm p)"
   by (simp add: perm_type_def)
+
+lemma perm_orbit_set_comm: "a \<in> set_cycle (perm_orbit p b) \<Longrightarrow> b \<in> set_cycle (perm_orbit p a)"
+  by (metis apply_cycle_perm_orbit apply_cycle_same_iff cycles_funpow
+      funpow_apply_perm_in_perm_orbit_iff start_in_perm_orbit_iff)
 
 locale perm_on =
   fixes p :: "'a perm" and S :: "'a set"
@@ -61,6 +108,9 @@ lemma set_perm_subset:
 lemma count_cycles_on_eq_card:
  "count_cycles_on S p = card (cycles_of_perm p) + card (S - set_perm p)"
   unfolding count_cycles_on_def by (simp add: perm_type_on_def size_perm_type_eq_card)
+
+lemma count_cycles_on_empty: "S = {} \<Longrightarrow> count_cycles_on S p = 0"
+  using count_cycles_on_eq_card set_perm_subset by auto
 
 lemma inverse_permutes: "(inverse p) permutes S"
   by (smt (verit, del_insts) apply_perm_inverse_not_in_set eq_apply_perm_inverse_iff
@@ -93,6 +143,14 @@ lemma (in wf_digraph) reach_sym_arc:
 
 lemma arc_to_ends_pair [simp]: "arc_to_ends (with_proj g) e = e"
   by simp
+
+lemma vpath_sublist: 
+  assumes "vpath (p @ q) G"
+  shows "p \<noteq> [] \<Longrightarrow> vpath p G"  "q \<noteq> [] \<Longrightarrow> vpath q G"
+  by (meson assms distinct_append vpath_def vwalkI_append_l vwalkI_append_r)+
+
+lemma (in wf_digraph) sccs_empty: "verts G = {} \<Longrightarrow> sccs = {}"
+  using sccs_verts_conv sccs_verts_conv_scc_of by force
 
 lemma (in wf_digraph) card_sccs_1: "card sccs = 1 \<Longrightarrow> sccs = {G}"
   by (smt (verit, del_insts) card_1_singletonE card_sccs_verts empty_iff image_empty
@@ -135,6 +193,7 @@ lemma reach_in_union:
   shows "x\<rightarrow>\<^sup>*\<^bsub>union g h\<^esub>y"
 by (meson assms pre_digraph.reachable_mono rtrancl_subset_rtrancl subgraphs_of_union(1))
 
+
 definition reverse :: "'a pair_pre_digraph \<Rightarrow> 'a pair_pre_digraph" ("(_\<^sup>R)" [1000] 999) where
 "reverse a = \<lparr>pverts = pverts a, parcs = (parcs a)\<inverse>\<rparr>"
 
@@ -150,20 +209,4 @@ lemma reach_reverse: "x\<rightarrow>\<^sup>*\<^bsub>with_proj g\<^esub>y \<Longr
 lemma (in pre_digraph) "scc_of x \<subseteq> verts G"
   using pre_digraph.scc_of_def reachable_in_vertsE by fastforce
 
-section \<open>Lemmas about graph union\<close>
-
-locale compatible_digraphs = G: wf_digraph G + H: wf_digraph H
-  for G :: "('a, 'b) pre_digraph" and H :: "('a, 'b) pre_digraph" +
-  assumes "compatible G H"
-begin
-
-interpretation graph_union: pre_digraph "union G H" .
-
-lemma sccs_union_subgraph: "x \<in> G.sccs \<Longrightarrow> \<exists>x' \<in> graph_union.sccs. subgraph x x'"
-  sorry
-
-lemma sccs_union: "\<exists>S. \<Union>S = G.sccs \<union> H.sccs \<and> G.Union ` S = graph_union.sccs"
-  sorry
-
-end
 end

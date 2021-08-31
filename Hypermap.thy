@@ -22,37 +22,19 @@ locale hypermap = pre_hypermap +
 begin
 
 text \<open>Basic properties of the functions\<close>
-lemma nodeK: "\<And>x. node H (face H (edge H x)) = x"
+lemma nodeK: "node H (face H (edge H x)) = x"
   by (meson apply_inj_eq_iff edgeK)
 
-lemma faceK: "\<And>x. face H (edge H (node H x)) = x"
+lemma faceK: "face H (edge H (node H x)) = x"
   by (meson apply_inj_eq_iff nodeK)
-
-lemma finite_perm_on_edge: "finite_perm_on (edge H) (darts H)"
-  by (simp add: finite_darts finite_perm_on_axioms.intro finite_perm_on_def perm_edge perm_on.intro)
-
-lemma finite_perm_on_node: "finite_perm_on (node H) (darts H)"
-  by (simp add: finite_darts finite_perm_on_axioms.intro finite_perm_on_def perm_node perm_on.intro)
-
-lemma finite_perm_on_face: "finite_perm_on (face H) (darts H)"
-  by (simp add: finite_darts finite_perm_on_axioms.intro finite_perm_on_def perm_face perm_on.intro)
-  
-lemma darts_edge: "set_perm (edge H) \<subseteq> darts H"
-  by (simp add: perm_edge perm_on.intro perm_on.set_perm_subset)
-
-lemma darts_node: "set_perm (node H) \<subseteq> darts H"
-  by (simp add: perm_node perm_on.intro perm_on.set_perm_subset)
-
-lemma darts_face: "set_perm (face H) \<subseteq> darts H"
-  by (simp add: perm_face perm_on.intro perm_on.set_perm_subset)
 
 lemma edge_inv: "inv (edge H) = node H * face H"
   by (metis apply_perm_sequence inverse_perm.rep_eq nodeK perm_edge perm_eqI
       permutes_surj surj_iff_all)
 
 lemma node_inv: "inv (node H) = face H * edge H"
-  by (metis apply_perm_sequence inverse_perm.rep_eq faceK perm_node perm_eqI
-      permutes_surj surj_iff_all)
+  by (metis Perm.apply_perm_inverse apply_perm_sequence faceK perm_eq_iff 
+      perm_node permutes_surj surj_iff_all)
 
 lemma face_inv: "inv (face H) = edge H * node H"
   by (metis apply_perm_sequence inverse_perm.rep_eq edgeK perm_face perm_eqI
@@ -66,11 +48,17 @@ definition cedge where
 lemma (in hypermap) wf_cedge: "pair_wf_digraph (cedge H)"
   unfolding cedge_def by (simp add: perm_edge Gr_wf_perm)
 
+lemma cedge_eq: "x \<in> darts h \<Longrightarrow> x\<rightarrow>\<^bsub>cedge h\<^esub>y \<longleftrightarrow> (edge h x = y)"
+  by (metis Gr_eq cedge_def)
+
 definition cnode where
  "cnode h \<equiv> (Gr (darts h) (node h))"
 
 lemma (in hypermap) wf_cnode: "pair_wf_digraph (cnode H)"
   unfolding cnode_def by (simp add: perm_node Gr_wf_perm wf_digraph_wp_iff)
+
+lemma cnode_eq: "x \<in> darts h \<Longrightarrow> x\<rightarrow>\<^bsub>cnode h\<^esub>y \<longleftrightarrow> (node h x = y)"
+  by (metis Gr_eq cnode_def)
 
 definition cface where
   "cface h \<equiv> (Gr (darts h) (face h))"
@@ -78,21 +66,34 @@ definition cface where
 lemma (in hypermap) wf_cface: "pair_wf_digraph (cface H)"
   unfolding cface_def by (simp add: perm_face Gr_wf_perm)
 
+lemma cface_eq: "x \<in> darts H \<Longrightarrow> x\<rightarrow>\<^bsub>cface H\<^esub>y \<longleftrightarrow> (face H x = y)"
+  by (metis Gr_eq cface_def)
+
 definition glink
   where "glink h = pair_union (cedge h) (pair_union (cnode h) (cface h))"
 
 lemma (in hypermap) wf_glink: "pair_wf_digraph (glink H)"
   unfolding glink_def by (simp add: wf_cface wf_cnode wf_cedge wf_pair_union)
 
+lemma verts_glink: "verts (glink H) = darts H"
+  by (simp add: cedge_def cface_def cnode_def glink_def)
+
+lemma (in hypermap) glink_enf:
+  assumes "x \<in> darts H"
+  shows "x\<rightarrow>\<^bsub>glink H\<^esub>y \<longleftrightarrow> edge H x = y \<or> node H x = y \<or> face H x = y" 
+  apply (rule iffI)
+   apply (metis Gr_eq assms cedge_eq cface_def cnode_def glink_def pair_union_arcs_disj)
+  by (metis assms cedge_eq cface_eq cnode_eq glink_def pair_union_arcs_disj)
+
 context hypermap begin
 lemma cedge_connect_sym: "wf_digraph.connect_sym (cedge H)"
-  by (metis cedge_def perm_edge perm_on.intro perm_on.perm_reach_sym)
+  by (metis cedge_def perm_edge perm_on.intro perm_on.perm_connect_sym)
 
 lemma cnode_connect_sym: "wf_digraph.connect_sym (cnode H)"
-  by (metis cnode_def perm_node perm_on.intro perm_on.perm_reach_sym)
+  by (metis cnode_def perm_node perm_on.intro perm_on.perm_connect_sym)
 
 lemma cface_connect_sym: "wf_digraph.connect_sym (cface H)"
-  by (metis cface_def perm_face perm_on.intro perm_on.perm_reach_sym)
+  by (metis cface_def perm_face perm_on.intro perm_on.perm_connect_sym)
 
 lemma glink_connect_sym: "wf_digraph.connect_sym (glink H)"
 proof -
@@ -105,14 +106,14 @@ proof -
     case (step x y)
     then have "y = edge H x \<or> y = node H x \<or> y = face H x"
       by (metis glink_def Gr_eq cedge_def cface_def cnode_def pair_union_arcs_disj with_proj_simps(3))
-    also have "y = edge H x \<Longrightarrow> y \<rightarrow>\<^sup>*\<^bsub>cedge H\<^esub> x"
-              "y = node H x \<Longrightarrow> y \<rightarrow>\<^sup>*\<^bsub>cnode H\<^esub> x"
-              "y = face H x \<Longrightarrow> y \<rightarrow>\<^sup>*\<^bsub>cface H\<^esub> x"
-      by (metis cedge_connect_sym cnode_connect_sym cface_connect_sym wf_cedge wf_cface wf_cnode
-          wf_digraph.connect_sym_def Gr_eq cedge_def cface_def cnode_def glink_def local.step(2)
-          pair_union_arcs_disj wf_digraph.reachable_adjI wf_digraph_wp_iff with_proj_simps(3))+
+    also have "(y = edge H x \<longrightarrow> y \<rightarrow>\<^sup>*\<^bsub>cedge H\<^esub> x) \<and>
+               (y = node H x \<longrightarrow> y \<rightarrow>\<^sup>*\<^bsub>cnode H\<^esub> x) \<and>
+               (y = face H x \<longrightarrow> y \<rightarrow>\<^sup>*\<^bsub>cface H\<^esub> x)"
+      by (metis Gr_eq cedge_connect_sym cnode_connect_sym cface_connect_sym cedge_def cface_def
+          cnode_def glink_def pair_union_arcs_disj step.hyps(2) wf_cedge wf_cnode wf_cface 
+          wf_digraph.reach_sym_arc wf_digraph_wp_iff with_proj_simps(3))
     ultimately have "y \<rightarrow>\<^sup>*\<^bsub>cedge H\<^esub>x \<or> y \<rightarrow>\<^sup>*\<^bsub>cnode H\<^esub> x \<or> y \<rightarrow>\<^sup>*\<^bsub>cface H\<^esub> x"
-      by auto
+      by fastforce
     then have "y \<rightarrow>\<^sup>*\<^bsub>glink H\<^esub> x"
       unfolding glink_def by (metis (no_types, hide_lams) reach_in_union comm_pair_union
           with_proj_union Gr_wf cedge_def cface_def cnode_def compatibleI_with_proj perm_edge
@@ -133,38 +134,8 @@ definition euler_rhs :: "'a pre_hypermap \<Rightarrow> nat" where
                count_cycles_on (darts h) (node h) +
                count_cycles_on (darts h) (face h)"
 
-text \<open>Needed for subtraction on naturals\<close>
-lemma (in hypermap) euler_rhs_ge_3: "darts H \<noteq> {} \<Longrightarrow> euler_rhs H \<ge> 3"
-proof -
-  assume "darts H \<noteq> {}"
-  then have "count_cycles_on (darts H) (edge H) > 0"
-            "count_cycles_on (darts H) (node H) > 0"
-            "count_cycles_on (darts H) (face H) > 0"
-      using finite_perm_on.count_cycles_on_nonempty finite_perm_on_face finite_perm_on_node
-        finite_perm_on_edge by blast+
-    then show "euler_rhs H \<ge> 3"
-      by (smt (z3) Suc_pred add.assoc add_mono_thms_linordered_field(3) euler_rhs_def leD le_add1 
-          linorder_cases not_less_eq_eq numeral_3_eq_3 plus_1_eq_Suc)
-qed
-
 definition euler_lhs :: "'a pre_hypermap \<Rightarrow> nat" where
 "euler_lhs h = card (pre_digraph.sccs (glink h)) * 2 + card (darts h)"
-
-lemma (in hypermap) euler_lhs_ge_3: "darts H \<noteq> {} \<Longrightarrow> euler_lhs H \<ge> 3"
-  sorry(*proof -
-  interpret glink_gr: pre_digraph "glink H" .
-  assume "darts H \<noteq> {}"
-  then have "pre_digraph.sccs (glink H) \<noteq> {}"
-  proof (simp add: glink_def cedge_def cnode_def cface_def)
-    
-    unfolding glink_def using compatible_digraphs.sccs_union with_proj_union perm_on.sccs_perm sledgehammer
-  hence "card (pre_digraph.sccs (glink H)) \<ge> 1"
-    using finite_darts sorry
-  also have "card (darts H) \<ge> 1"
-    by (meson \<open>darts H \<noteq> {}\<close> card_eq_0_iff finite_darts less_one not_less)
-  ultimately show ?thesis
-    unfolding euler_lhs_def by linarith
-qed*)
 
 definition genus where
 "genus h \<equiv> (euler_lhs h - euler_rhs h) div 2"
@@ -181,69 +152,76 @@ context hypermap
 begin
 
 lemma wf_clink: "pair_wf_digraph (clink H)"
-  apply unfold_locales
-  by (simp add: clink_def pair_wf_digraph.arc_fst_in_verts pair_wf_digraph.wf_reverse
-      wf_cface wf_cnode wf_pair_union pair_wf_digraph.arc_snd_in_verts)+
+  by (simp add: clink_def pair_wf_digraph.wf_reverse wf_cface wf_cnode wf_pair_union)
 
 lemma finite_clink: "fin_digraph (clink H)"
+  apply (auto simp add: fin_digraph_def wf_clink wf_digraph_wp_iff)
+  by (simp add: cface_def clink_def cnode_def fin_digraph_axioms_def finite_darts 
+      perm_node perm_on.Gr_reverse_eq_inv perm_on.intro)
+
+lemma verts_clink [simp]: "verts (clink H) = darts H"
+  by (simp add: cface_def clink_def cnode_def perm_node perm_on.Gr_reverse_eq_inv perm_on.intro)
+
+lemma clinkP: "(y\<rightarrow>\<^bsub>cnode H\<^esub> x \<or> x \<rightarrow>\<^bsub>cface H\<^esub> y) \<longleftrightarrow> x\<rightarrow>\<^bsub>clink H\<^esub> y"
+  unfolding clink_def apply (rule iffI)
+   apply (meson arc_reverse pair_union_arcs_disj)
+  by (metis converse_iff pair_pre_digraph.select_convs(2) 
+      pair_union_arcs_disj reverse_def with_proj_simps(3))
+
+lemma arc_clink: "x \<in> darts H \<Longrightarrow> x \<rightarrow>\<^bsub>clink H\<^esub>y \<longleftrightarrow> y = face H x \<or> x = node H y"
 proof
-  fix e assume "e \<in> arcs (clink H)"
-  then show "tail (clink H) e \<in> verts (clink H)" "head (clink H) e \<in> verts (clink H)"
-     apply (metis clink_def pair_wf_digraph.wf_reverse wf_cface wf_cnode wf_digraph.tail_in_verts
-        wf_digraph_wp_iff wf_pair_union)
-    by (metis \<open>e \<in> arcs (with_proj (clink H))\<close> clink_def pair_wf_digraph.wf_reverse wf_cface
-        wf_cnode wf_digraph.head_in_verts wf_digraph_wp_iff wf_pair_union)
-next
-  show "finite (verts (clink H))"
-    by (simp add: finite_darts cface_def clink_def cnode_def perm_node
-        perm_on.Gr_reverse_eq_inv perm_on.intro)
-  then have "finite (arcs (cface H))"
-    by (simp add: cface_def finite_darts)
-  also have "finite (arcs ((cnode H)\<^sup>R))"
-    by (simp add: cnode_def finite_darts perm_node perm_on.Gr_reverse_eq_inv perm_on.intro)
-  ultimately show "finite (arcs (clink H))"
-    by (simp add: clink_def)
+  show "x \<rightarrow>\<^bsub>clink H\<^esub> y \<Longrightarrow> y = (face H) \<langle>$\<rangle> x \<or> x = (node H) \<langle>$\<rangle> y"
+    by (metis Gr_eq cface_def clink_def cnode_def converse.cases pair_pre_digraph.select_convs(2)
+      pair_union_arcs_disj reverse_def with_proj_simps(3))
+  assume *:"x \<in> darts H" "y = face H x \<or> x = node H y"
+  then show "x \<rightarrow>\<^bsub>clink H\<^esub>y"
+    by (metis Gr_eq cface_def clinkP cnode_def perm_face perm_node permutes_in_image)
 qed
 
-lemma clinkP:
-  assumes "x \<in> darts H" and "y \<in> darts H"
-  shows "(y\<rightarrow>\<^bsub>cnode H\<^esub> x \<or> x \<rightarrow>\<^bsub>cface H\<^esub> y) \<Longrightarrow> x\<rightarrow>\<^bsub>clink H\<^esub> y"
-  unfolding clink_def by (meson arc_reverse pair_union_arcs_disj)
+lemma parcs_clink:
+  assumes "a \<in> darts H"
+  shows "(a,b) \<in> parcs (clink H) \<longleftrightarrow> a = node H b \<or> b = face H a"
+  apply rule
+   apply (metis arc_clink pair_wf_digraph.in_arcsD1 verts_clink wf_clink with_proj_simps(1,3))
+  using assms arc_clink with_proj_simps(3) by blast
 
 lemma clinkN: "x \<in> darts H \<Longrightarrow> node H x\<rightarrow>\<^bsub>clink H\<^esub>x"
-  by (metis Gr_eq clinkP cnode_def perm_node permutes_in_image)
+  by (metis Gr_eq clinkP cnode_def)
 
 lemma clinkF: "x \<in> darts H \<Longrightarrow> x\<rightarrow>\<^bsub>clink H\<^esub>face H x"
-  by (metis Gr_eq cface_def hypermap.clinkP hypermap_axioms perm_face permutes_in_image)
+  by (metis Gr_eq cface_def hypermap.clinkP hypermap_axioms)
 
-text \<open>Copies the glink_rtrancl_sym proof\<close>
 lemma clink_connect_sym: "wf_digraph.connect_sym (clink H)"
 proof -
   interpret pair_wf_digraph "clink H" by (rule wf_clink)
-  have "u \<rightarrow>\<^sup>*\<^bsub>clink H\<^esub>v" if "v \<rightarrow>\<^sup>*\<^bsub>clink H\<^esub>u" for u v
-  using that proof (induct rule: reachable_induct)
+  have "v \<rightarrow>\<^sup>*\<^bsub>clink H\<^esub>u \<Longrightarrow> u \<rightarrow>\<^sup>*\<^bsub>clink H\<^esub>v" for u v
+  proof (induct rule: reachable_induct)
     case base
     then show ?case by simp
   next
     case (step x y)
-    have *: "y = node H x \<Longrightarrow> x \<rightarrow>\<^sup>*\<^bsub>(cnode H)\<^sup>R\<^esub> y" "y = face H x \<Longrightarrow> y \<rightarrow>\<^sup>*\<^bsub>cface H\<^esub> x"
-      by (metis clink_def wf_digraph.reach_sym_arc cnode_connect_sym wf_cface
-          Gr_eq wf_cnode cface_def cnode_def local.step(2) pair_union_arcs_disj
-          converse_iff pair_pre_digraph.simps(2) reverse_def wf_digraph.reachable_adjI 
-          wf_digraph_wp_iff with_proj_simps(3) reach_reverse cface_connect_sym perm_face
-          permutes_in_image)+
-    then have "x \<rightarrow>\<^sup>*\<^bsub>(cnode H)\<^sup>R\<^esub> y \<or> y \<rightarrow>\<^sup>*\<^bsub>cface H\<^esub> x"
-      by (metis step.hyps(2) clink_def Gr_eq Gr_wf cface_def cnode_def pair_union_arcs_disj
-        perm_node permutes_in_image wf_digraph.reachable_adjI wf_digraph_wp_iff with_proj_simps(3)
-        pair_wf_digraph.wf_reverse)
-    then have "y \<rightarrow>\<^sup>*\<^bsub>(clink H)\<^esub> x"
-      by (smt (verit, del_insts) step.hyps(2) reach_in_union comm_pair_union with_proj_union Gr_wf
-          cface_def cnode_def compatibleI_with_proj perm_face perm_node permutes_in_image
-          wf_digraph_wp_iff Gr_eq *(2) clink_def cnode_connect_sym converse_iff 
-          pair_pre_digraph.simps(2) pair_union_arcs_disj reach_reverse reverse_def 
-          wf_digraph.reachable_adjI with_proj_simps(3) pair_wf_digraph.wf_reverse
-          wf_digraph.connect_sym_def)
-    then show "y \<rightarrow>\<^sup>*\<^bsub>with_proj (clink H)\<^esub> v"
+    then consider (node) "x = node H y" | (face) "y = face H x"
+      by (metis parcs_clink reachable_in_vertsE verts_clink)
+    then have "y\<rightarrow>\<^sup>*\<^bsub>clink H\<^esub>x"
+    proof cases
+      case node
+      then have "y \<rightarrow>\<^sup>*\<^bsub>(cnode H)\<^sup>R\<^esub> x"
+        by (metis cnode_connect_sym cnode_eq head_in_verts reach_reverse snd_conv step.hyps(2) 
+            verts_clink wf_cnode wf_digraph.reach_sym_arc wf_digraph_wp_iff with_proj_simps(1))
+      then show ?thesis
+        by (metis (no_types, hide_lams) clink_def comm_pair_union compatibleI_with_proj 
+            pair_wf_digraph.wf_reverse reach_in_union wf_cface wf_cnode wf_digraph_wp_iff 
+            with_proj_union)
+    next
+      case face
+      then have "y \<rightarrow>\<^sup>*\<^bsub>cface H\<^esub> x"
+        by (metis Gr_eq cface_connect_sym cface_def reachable_in_vertsE step.hyps(3) verts_clink
+            wf_cface wf_digraph.reach_sym_arc wf_digraph_wp_iff)
+      then show ?thesis
+        by (smt (verit, ccfv_threshold) clinkP in_arcsD2 reachable_adj_trans reachable_refl 
+            step.hyps(2) wf_cface wf_digraph.reachable_induct wf_digraph_wp_iff with_proj_simps(3))
+    qed
+    then show "y \<rightarrow>\<^sup>*\<^bsub>clink H\<^esub> v"
       by (meson reachable_trans step.hyps(3))
   qed
   then show ?thesis unfolding connect_sym_def by blast
@@ -293,10 +271,8 @@ next
       next
         case node
         then show ?thesis
-          by (metis Gr_pverts clinkP clink_connect_sym cnode_def fin_digraph.axioms(1)
-              finite_clink step.hyps(3) wf_cnode wf_digraph.adj_in_verts(1)
-              wf_digraph.adj_in_verts(2) wf_digraph.adj_reachable_trans wf_digraph.connect_sym_def
-              wf_digraph_wp_iff with_proj_simps(1))
+          by (meson clinkP clink_connect_sym fin_digraph.axioms(1) finite_clink step.hyps(3)
+              wf_digraph.adj_reachable_trans wf_digraph.connect_sym_def)
       next
         case face
         then show ?thesis
@@ -313,11 +289,10 @@ lemma connected_clink:
   assumes "connected_hypermap" "x \<in> (darts H)" "y \<in> (darts H)"
   shows "\<exists>p. clink.apath x p y"
 proof -
-  from assms(1) have "x \<rightarrow>\<^sup>*\<^bsub>glink H\<^esub> y" using connected_hypermap_def assms strongly_connected_def
-    by (metis (no_types, lifting) Gr_eq clinkP clink_glink cnode_def wf_glink perm_node 
-        permutes_in_image clink.reachable_adjI wf_digraph.reachable_in_verts(2) wf_digraph_wp_iff
-        with_proj_simps(3))
-  then show ?thesis using clink_glink clink.reachable_apath by simp
+  from assms have "x \<rightarrow>\<^sup>*\<^bsub>glink H\<^esub> y"
+    by (metis connected_hypermap_def strongly_connected_def verts_glink)
+  then show ?thesis
+    using clink_glink clink.reachable_apath by simp
 qed
 
 text \<open>A "Moebius path" is a contour that cannot appear in a planar map, as it goes from the inside
@@ -326,33 +301,28 @@ text \<open>A "Moebius path" is a contour that cannot appear in a planar map, as
 fun moebius_path where
   "moebius_path [] = False"
 | "moebius_path (_ # []) = False"
-| "moebius_path p = (vpath p (clink H)
-                    \<and> appears_before p (face H (edge H (last p))) (node H (hd p)))"
+| "moebius_path (x # p) = (vpath (x#p) (clink H)
+                    \<and> appears_before p (face H (edge H (last p))) (node H x))"
 
-lemma "moebius_path p \<Longrightarrow> length p \<ge> 3"
-proof (rule ccontr)
-  assume *: "moebius_path p" "\<not> length p \<ge> 3"
-  then consider "length p = 0 \<or> length p = 1" | "length p = 2"
-    by linarith
-  then show "False"
-  proof cases
-    case 1
-    then show ?thesis
-      using *(1) moebius_path.elims(2) by fastforce
-  next
-    case 2
-    then have **: "vpath p (clink H)" "appears_before p (face H (edge H (last p))) (node H (hd p))"
-      using *(1) hypermap.moebius_path.elims hypermap_axioms by blast+
-    then have elems: "face H (edge H (last p)) \<in> set p \<and> node H (hd p) \<in> set p"
-      using appears_before_in by auto
-    from 2 obtain x y where "p = [x,y]"
-      by (metis (no_types, lifting) length_0_conv length_Suc_conv numeral_2_eq_2)
+lemma moebius_path_length: "moebius_path p \<Longrightarrow> length p \<ge> 3"
+proof -
+  assume *: "moebius_path p"
+  then have less_2: "False" if "length p < 2"
+    using that hypermap.moebius_path.elims(2) hypermap_axioms by fastforce
+  {
+    assume "length p = 2"
+    then obtain x y where "p = [x,y]"
+      by (metis (no_types, hide_lams) One_nat_def Suc_1 length_0_conv length_Suc_conv)
     then have "x \<noteq> y"
-      by (metis  *(1) vpath_def distinct_length_2_or_more moebius_path.simps(3))
-    then have "face H (edge H y) = y \<and> x = node H x \<or> face H (edge H y) = x \<and> y = node H x"
-      by (metis \<open>p = [x,y]\<close> elems empty_iff empty_set faceK hypermap.nodeK hypermap_axioms last.simps list.distinct(1) list.sel(1) set_ConsD)
-    then show "False" using \<open>x \<noteq> y\<close> node_inv sorry
-  qed
+      by (metis * distinct_length_2_or_more hypermap.moebius_path.simps(3) hypermap_axioms vpath_def)
+    also have "appears_before [y] (face H (edge H y)) (node H x)"
+      using * \<open>p = [x, y]\<close> by auto
+    then have "x = y"
+      by (metis appears_before_in empty_set faceK list.simps(15) singletonD)
+    ultimately have False by simp
+  }
+  then show ?thesis
+    using less_2 by force
 qed
 
 definition "jordan = (\<forall>p. \<not> (moebius_path p))"
@@ -369,9 +339,12 @@ context hypermap begin
 lemma hypermap_permN: "hypermap (permN H)"
   by (simp add: finite_darts hypermap_def nodeK permN_def perm_edge perm_face perm_node)
 
+lemma darts_permN: "darts (permN H) = darts H"
+  by (simp add: permN_def)
+
 lemma permN_connect1_glink: "x\<rightarrow>\<^bsub>glink H\<^esub>y \<longleftrightarrow> x\<rightarrow>\<^bsub>glink (permN H)\<^esub>y"
   by (metis (no_types, lifting) cedge_def cface_def cnode_def glink_def pair_union_arcs_disj 
-      permN_def pre_hypermap.select_convs(1,2,3,4))
+      permN_def pre_hypermap.select_convs(1-4))
 
 lemma permN_glink: "glink H = glink (permN H)"
 proof -
@@ -402,6 +375,9 @@ lemma planar_permN: "planar H = planar (permN H)"
 
 lemma hypermap_permF: "hypermap (permF H)"
   by (simp add: finite_darts hypermap_def faceK permF_def perm_edge perm_face perm_node)
+
+lemma darts_permF: "darts (permF H) = darts H"
+  by (simp add: permF_def)
 
 lemma permF_connect1_glink: "x\<rightarrow>\<^bsub>glink H\<^esub>y \<longleftrightarrow> x\<rightarrow>\<^bsub>glink (permF H)\<^esub>y"
   by (metis (no_types, lifting) cedge_def cface_def cnode_def glink_def pair_union_arcs_disj 
@@ -434,7 +410,7 @@ qed
 lemma planar_permF: "planar H = planar (permF H)"
   by (simp add: genus_permF planar_def)
 
-
+(*
 definition dual :: "'a pre_hypermap" where
 "dual = \<lparr>darts = darts H, edge = inverse (edge H), node = inverse (face H), face = inverse (node H)\<rparr>"
 
@@ -448,9 +424,6 @@ proof
        "node dual permutes darts dual"
        "face dual permutes darts dual"
     by (simp_all add: perm_on.inverse_permutes dual_def perm_edge perm_node perm_face perm_on_def)
-qed
-
-lemma "clink dual = clink H"
-  sorry
+qed*)
 end
 end

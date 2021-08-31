@@ -1,6 +1,5 @@
-# Formalization of planar hypermaps in Isabelle/HOL
+This project depends on the List-Index and Graph_Theory afp entries. They can be downloaded from isa-afp.org. 
 
-Hypermaps are the data structure used to represent planar maps for the Coq proof of the four color theorem, available [here](https://github.com/math-comp/fourcolor).
+The ROOTS file assumes that the afp theories can be found under ~/Documents/afp/thys/ - this can be easily changed by editing the ROOTS file.
 
-This development aims to implement hypermaps in Isabelle/HOL, with the aim of eventually producing a full proof of the four color theorem.
-To this end, the repository mirrors the file structure and operations used in the Coq proof.
+The Perm theory was developed by Florian Haftmann and Manuel Eberl, and is only provided here because it has not been officially released.

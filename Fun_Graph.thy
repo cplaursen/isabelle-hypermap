@@ -43,34 +43,35 @@ proof (induct n)
   then show ?case using assms by (simp add: Fun_Graph.Gr_def reachable_def)
 next
   case (Suc n)
-  then have "(f ^^ n) a \<rightarrow>\<^sup>*\<^bsub>Gr S f\<^esub> (f ^^ (Suc n)) a"
-    by (metis assms(2) Gr_eq Gr_verts Gr_wf funpow_simp_l reachable_in_vertsE 
-        wf_digraph.reachable_adjI wf_digraph_wp_iff)
+  then have "(f ^^ n) a \<rightarrow>\<^bsub>Gr S f\<^esub> (f ^^ (Suc n)) a"
+    by (metis Gr_eq Gr_verts funpow_simp_l reachable_in_vertsE)
   then show ?case
-    by (metis (no_types, lifting) Gr_eq Gr_verts Suc funpow_simp_l reachable_def
-        reachable_in_vertsE rtrancl_on.rtrancl_on_into_rtrancl_on)
+    by (meson Gr_wf Suc.hyps assms(2) wf_digraph.reachable_adj_trans wf_digraph_wp_iff)
 qed
 
 lemma reach_iff_funpow:
   assumes "a \<in> S" "\<forall>x \<in> S. f x \<in> S"
-  shows "a\<rightarrow>\<^sup>*\<^bsub>Gr S f\<^esub>b \<longleftrightarrow> (\<exists>n. (f ^^ n) a = b)" (is "?L \<longleftrightarrow> ?R")
+  shows "a\<rightarrow>\<^sup>*\<^bsub>Gr S f\<^esub>b \<longleftrightarrow> (\<exists>n. (f ^^ n) a = b)" 
 proof
   interpret wf_digraph "Gr S f"
     by (simp add: Gr_wf assms(2) wf_digraph_wp_iff)
-  assume ?L then show ?R
+  assume "a\<rightarrow>\<^sup>*\<^bsub>Gr S f\<^esub>b" then show "(\<exists>n. (f ^^ n) a = b)"
   proof (induct rule: reachable_induct)
-    case base
+    case base                   
     then show ?case by (meson funpow_0)
   next
     case (step x y)
-    then obtain n where "(f ^^ n) a = x" by auto
-    also have "f x = y" by (metis Gr_eq step.hyps(2) with_proj_simps(3))
-    ultimately show ?case by (metis funpow_simp_l)
+    then obtain n where "(f ^^ n) a = x"
+      by auto
+    also have "f x = y"
+      by (metis Gr_eq step.hyps(2) with_proj_simps(3))
+    ultimately show ?case 
+      by (metis funpow_simp_l)
   qed
 next
-  assume *: ?R
+  assume *: "(\<exists>n. (f ^^ n) a = b)"
   then obtain n where "(f ^^ n) a = b" by auto
-  then show ?L
+  then show "a\<rightarrow>\<^sup>*\<^bsub>Gr S f\<^esub>b"
     using assms funpow_in_rtrancl by meson
 qed
 
@@ -81,25 +82,6 @@ begin
 
 interpretation Gr: pair_wf_digraph "Gr S p"
   by (simp add: Fun_Graph.Gr_def pair_wf_digraph_def permutes_p permutes_in_image)
-
-lemma Gr_reverse_eq_inv: "(Gr S p)\<^sup>R = Gr S (inv p)"
-proof (simp add: Gr_def reverse_def; rule; rule)
-  fix x assume *: "x \<in> {(a, p \<langle>$\<rangle> a) |a. a \<in> S}\<inverse>"
-  then obtain a b where "(a,b) = x" by auto
-  then have "a = p b" using * converseI by auto
-  hence "b = (inv p) a" by (metis permutes_inverses(2) permutes_p)
-  then show "x \<in> {(a, inv ((\<langle>$\<rangle>) p) a) |a. a \<in> S}"
-    using * \<open>(a,b) = x\<close> bij_betwE permutes_imp_bij permutes_p by fastforce
-next
-  fix x assume *: "x \<in> {(a, inv ((\<langle>$\<rangle>) p) a) |a. a \<in> S}"
-  then obtain a b where "(a,b) = x" by auto
-  then have "a = p b"
-    by (smt (verit, del_insts) * Pair_inject mem_Collect_eq permutes_inv_eq permutes_p)
-  then have "(b,a) \<in> {(a, p \<langle>$\<rangle> a) |a. a \<in> S}"
-    using * \<open>(a,b) = x\<close> permutes_not_in permutes_p by fastforce
-  then show "x \<in> {(a, p \<langle>$\<rangle> a) |a. a \<in> S}\<inverse>"
-    using \<open>(a,b) = x\<close> by auto
-qed
 
 lemma reach_iff_funpow_perm:
   assumes "a \<in> S"
@@ -123,26 +105,20 @@ next
     by (metis (no_types, lifting) Fun_Graph.Gr_def reach_iff_funpow_perm pair_pre_digraph.simps(1)
         Gr.reachable_in_verts(1))
   then show ?L
-    by (metis assms funpow_apply_perm_in_perm_orbit_iff id_funpow_id start_in_perm_orbit_iff)
+    by (metis assms funpow_cycles perm_orbit_set_comm)
 qed
 
-lemma perm_reach_sym: "Gr.connect_sym"
+lemma perm_connect_sym: "Gr.connect_sym"
 proof (auto simp: Gr.connect_sym_def)
-  fix a b assume "a \<rightarrow>\<^sup>*\<^bsub>Gr S p\<^esub> b"
-  then show "b \<rightarrow>\<^sup>*\<^bsub>Gr S p\<^esub> a"
-proof (induct rule: Gr.reachable_induct)
-case base
-  then show ?case by simp
-next
-  let ?G = "Gr S p"
-  case (step x y)
-  then have "y \<rightarrow>\<^sup>*\<^bsub>?G\<^esub> x"
-    by (smt (verit, best) Fun_Graph.Gr_def Gr.adj_in_verts(2) apply_perm_power
-        funpow_apply_cycle_perm_orbit funpow_apply_perm_in_perm_orbit_iff pair_pre_digraph.simps(1)
-        perm_cycles_iff_reach reach_iff_funpow_perm Gr.reachable_adjI Gr.reachable_in_verts(1) 
-        Gr.reachable_refl set_cycle_ex_funpow)
-  then show ?case by (meson Gr.reachable_trans step.hyps(3))
-qed
+  fix a b assume *: "a \<rightarrow>\<^sup>*\<^bsub>Gr S p\<^esub> b"
+  then have "a = b \<Longrightarrow> b \<rightarrow>\<^sup>*\<^bsub>Gr S p\<^esub> a"
+    by blast
+  also have "a \<noteq> b \<Longrightarrow> b \<in> set_cycle (perm_orbit p a)"
+    by (simp add: "*" perm_cycles_iff_reach)
+  then have "a \<noteq> b \<Longrightarrow> a \<in> set_cycle (perm_orbit p b)"
+    by (meson perm_orbit_set_comm)
+  ultimately show "b \<rightarrow>\<^sup>*\<^bsub>Gr S p\<^esub> a"
+    by (metis perm_cycles_iff_reach)
 qed
 end
 
@@ -151,17 +127,20 @@ lemma wf_digraph_cycle: "wf_digraph (Gr (set_cycle c) (apply_cycle c))"
   by (simp add: Gr_wf wf_digraph_wp_iff)
 
 lemma strongly_connected_cycle:
-  assumes "c \<noteq> id_cycle"
-  shows "strongly_connected (Gr (set_cycle c) (apply_cycle c))" (is "strongly_connected ?G")
+ "c \<noteq> id_cycle \<Longrightarrow> strongly_connected (Gr (set_cycle c) (apply_cycle c))"
 proof
-  show "verts ?G \<noteq> {}"
-    using assms by simp
+  let ?G = "(Gr (set_cycle c) (apply_cycle c))"
+  assume "c \<noteq> id_cycle"
+  then show "verts ?G \<noteq> {}"
+    by simp
   fix u v assume "u \<in> verts ?G" "v \<in> verts ?G"
   then show "u \<rightarrow>\<^sup>*\<^bsub>?G\<^esub> v"
     by (metis Gr_verts apply_cycle_in_set_iff funpow_in_rtrancl set_cycle_ex_funpow)
 qed
 
-lemma (in perm_on) perm_orbit_subgraph:
+context perm_on begin
+
+lemma perm_orbit_subgraph:
   assumes "orb \<in> cycles_of_perm p"
   shows "subgraph (with_proj (Gr (set_cycle orb) (apply_cycle orb))) (with_proj (Gr S p))"
 proof (auto simp: subgraph_def)
@@ -175,7 +154,7 @@ proof (auto simp: subgraph_def)
     by (simp add: wf_digraph_cycle)
 qed
 
-lemma (in perm_on) perm_orbit_induced_subgraph:
+lemma perm_orbit_induced_subgraph:
   assumes "orb \<in> cycles_of_perm p"
   shows "induced_subgraph (with_proj (Gr (set_cycle orb) (apply_cycle orb))) (with_proj (Gr S p))"
     (is "induced_subgraph ?orbit ?G")
@@ -190,19 +169,18 @@ proof (auto simp add: induced_subgraph_def)
     by (simp add: \<open>apply_cycle orb a = p \<langle>$\<rangle> a\<close>)
 qed
 
-lemma (in perm_on) perm_id_subgraph:
+lemma perm_id_subgraph:
   assumes "c \<notin> set_perm p" "c \<in> S"
   shows "subgraph (with_proj (Gr {c} id)) (with_proj (Gr S p))"
   by (auto simp: subgraph_def assms apply_perm_eq_same_iff(2) Gr_wf  Gr_wf_perm
       permutes_p wf_digraph_wp_iff)
 
-lemma (in perm_on) perm_id_induced_subgraph:
+lemma perm_id_induced_subgraph:
   assumes "c \<notin> set_perm p" "c \<in> S"
   shows "induced_subgraph (with_proj (Gr {c} id)) (with_proj (Gr S p))"
   by (auto simp: assms induced_subgraph_def perm_id_subgraph apply_perm_eq_same_iff(2))
 
 subsection \<open>Connected components of a permutation\<close>
-context perm_on begin
 
 interpretation Gr: pair_wf_digraph "Gr S p"
   by (simp add: Fun_Graph.Gr_def pair_wf_digraph_def permutes_p permutes_in_image)
@@ -222,12 +200,11 @@ proof (rule subset_antisym; rule subsetI)
     case True
     then have "verts x = {v}"
     proof -
-      { fix u assume "u \<in> verts x" "u \<noteq> v"
-        then have "False"
+      have "False" if "u \<in> verts x" "u \<noteq> v" for u      
           by (metis Gr.reachable_mono True \<open>v \<in> verts x\<close> emptyE id_cycle_eq_perm_orbit_iff
               induced_imp_subgraph perm_on.perm_cycles_iff_reach perm_on_axioms set_cycle_id
-              strongly_connected_def x_scc(1) x_scc(2))
-      } then show "verts x = {v}"
+              strongly_connected_def x_scc(1,2) that)
+      then show "verts x = {v}"
         using \<open>v \<in> verts x\<close> by blast
     qed
     then have "x \<in> ?Id"
@@ -243,7 +220,7 @@ proof (rule subset_antisym; rule subsetI)
     define cycle_v where "cycle_v \<equiv> perm_orbit p v"
     then have "cycle_v \<in> cycles_of_perm p"
     using perm_orbit_in_cycles_of_perm \<open>v \<in> set_perm p\<close> by blast
-  also have "x = with_proj (Gr (set_cycle cycle_v) (apply_cycle cycle_v))"
+    also have "x = with_proj (Gr (set_cycle cycle_v) (apply_cycle cycle_v))"
     by (smt (verit) x_scc \<open>v \<in> verts x\<close> Gr.induce_eq_iff_induced Gr_pverts apply_cycle_perm_orbit'
         apply_cycle_same_iff calculation cycle_v_def id_cycle_eq_perm_orbit_iff
         induced_imp_subgraph perm_on.perm_cycles_iff_reach perm_on_axioms
@@ -252,7 +229,7 @@ proof (rule subset_antisym; rule subsetI)
   ultimately show "x \<in> ?C \<union> ?Id"
     by simp
   qed
-next
+  next
   fix G assume "G \<in> ?C \<union> ?Id"
   then consider (cycle) "G \<in> ?C" | (id) "G \<in> ?Id"
     by auto
@@ -315,6 +292,44 @@ next
   qed
 qed
 
+lemma count_cycles_card_sccs: "finite S \<Longrightarrow> card Gr.sccs = count_cycles_on S p"
+proof (simp add: count_cycles_on_def perm_type_on_def sccs_perm)
+  assume *: "finite S"
+  let ?cycle_graphs = "(\<lambda>x. with_proj (Gr (set_cycle x) (apply_cycle x))) ` cycles_of_perm p"
+  let ?id_graphs = "(\<lambda>c. with_proj (Gr {c} id)) ` {x \<in> S. p \<langle>$\<rangle> x = x}"
+
+  have "(S - set_perm p) = {x \<in> S. p \<langle>$\<rangle> x = x}"
+    by blast
+  also have "inj (\<lambda>c. with_proj (Gr {c} id))"
+    by (metis (no_types, lifting) Gr_pverts inj_onI singleton_inject with_proj_simps(1))
+  then have "card ?id_graphs = card {x \<in> S. p \<langle>$\<rangle> x = x}"
+    by (smt (verit, ccfv_SIG) Gr_pverts card_image inj_onI singleton_inject with_proj_simps(1))
+  ultimately have card_id: "card (S - set_perm p) = card ?id_graphs"
+    by presburger
+
+  have "size (perm_type p) = card (cycles_of_perm p)"
+    by (simp add: size_perm_type_eq_card)
+  also have "disjoint (set_cycle ` cycles_of_perm p)"
+    by (meson disjoint_cycles_cycles_of_perms disjoint_cycles_def disjoint_family_on_disjoint_image)
+  then have "inj_on set_cycle (cycles_of_perm p)"
+    by (smt (verit) disjnt_def disjnt_iff disjoint_cycles_cycles_of_perms disjoint_cycles_def 
+        disjoint_family_onD empty_subsetI equalityI inj_on_def set_cycle_empty_iff subset_iff)
+  then have "inj_on (\<lambda>c. with_proj (Gr (set_cycle c) ((\<langle>$\<rangle>) (cycle_perm c)))) (cycles_of_perm p)"
+    by (metis (mono_tags, lifting) Gr_verts inj_on_def)
+  then have "card (cycles_of_perm p) = card ?cycle_graphs"
+    using card_image by fastforce
+  ultimately have card_cycles: "size (perm_type p) = card ?cycle_graphs"
+    by presburger
+
+  have "card (?cycle_graphs \<union> ?id_graphs) = card ?cycle_graphs + card ?id_graphs"
+    apply (rule card_Un_disjoint)
+      apply (simp_all add: * finite_cycles_of_perm)
+      by (smt (verit, ccfv_SIG) Gr_verts apply_cycle_perm_orbit apply_cycle_same_iff 
+        cycles_of_perm_def disjoint_iff imageE mem_Collect_eq singletonI)
+  then show "card (?cycle_graphs \<union> ?id_graphs) = size (perm_type p) + card (S - set_perm p)"
+    using card_cycles card_id by presburger
+qed
+
 lemma sccs_set_perm:
   assumes "S = set_perm p"
   shows "Gr.sccs = (\<lambda>c. with_proj (Gr (set_cycle c) (cycle_perm c))) ` (cycles_of_perm p)"
@@ -325,7 +340,7 @@ proof -
     using sccs_perm by auto
 qed
 
-lemma scc_of_orbit: 
+lemma scc_of_orbit:
   assumes "x \<in> S"
   shows "Gr.scc_of x = (if p \<langle>$\<rangle> x = x then {x} else set_cycle (perm_orbit p x))"
 proof (cases "p \<langle>$\<rangle> x = x")
@@ -345,7 +360,7 @@ next
   have "Gr.scc_of x = set_cycle (perm_orbit p x)"
   proof (rule subset_antisym; rule subsetI)
     fix y assume "y \<in> Gr.scc_of x"
-    then have "y \<rightarrow>\<^sup>*\<^bsub>Gr S p\<^esub> x \<and> x \<rightarrow>\<^sup>*\<^bsub>Gr S p\<^esub> y"
+    then have "x \<rightarrow>\<^sup>*\<^bsub>Gr S p\<^esub> y"
       using Gr.in_scc_of_self Gr.in_sccs_verts_conv_reachable Gr.scc_of_in_sccs_verts assms by auto
     then show "y \<in> set_cycle (perm_orbit p x)"
       by (metis False perm_cycles_iff_reach start_in_perm_orbit)
@@ -353,11 +368,30 @@ next
     fix y assume "y \<in> set_cycle (perm_orbit p x)"
     then show "y \<in> Gr.scc_of x"
       by (metis (full_types, lifting) Gr.connect_sym_def Gr.scc_of_def Gr.wf_digraph_axioms
-          Gr_pverts assms mem_Collect_eq perm_cycles_iff_reach perm_reach_sym 
+          Gr_pverts assms mem_Collect_eq perm_cycles_iff_reach perm_connect_sym 
           wf_digraph.reachable_refl with_proj_simps(1))
   qed
   then show ?thesis
     using False by presburger
+qed
+
+lemma Gr_reverse_eq_inv: "(Gr S p)\<^sup>R = Gr S (inv p)"
+proof (simp add: Gr_def reverse_def; rule; rule)
+  fix x assume *: "x \<in> {(a, p \<langle>$\<rangle> a) |a. a \<in> S}\<inverse>"
+  then obtain a b where "(a,b) = x" by auto
+  then have "a = p b" using * converseI by auto
+  then have "b = (inv p) a" by (metis permutes_inverses(2) permutes_p)
+  then show "x \<in> {(a, inv ((\<langle>$\<rangle>) p) a) |a. a \<in> S}"
+    using * \<open>(a,b) = x\<close> bij_betwE permutes_imp_bij permutes_p by fastforce
+next
+  fix x assume *: "x \<in> {(a, inv ((\<langle>$\<rangle>) p) a) |a. a \<in> S}"
+  then obtain a b where "(a,b) = x" by auto
+  then have "a = p b"
+    by (smt (verit, del_insts) * Pair_inject mem_Collect_eq permutes_inv_eq permutes_p)
+  then have "(b,a) \<in> {(a, p \<langle>$\<rangle> a) |a. a \<in> S}"
+    using * \<open>(a,b) = x\<close> permutes_not_in permutes_p by fastforce
+  then show "x \<in> {(a, p \<langle>$\<rangle> a) |a. a \<in> S}\<inverse>"
+    using \<open>(a,b) = x\<close> by auto
 qed
 end
 end

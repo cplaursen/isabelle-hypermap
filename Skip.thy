@@ -58,6 +58,9 @@ proof
    qed
  qed
 
+lemma skip_perm_invariant: "x \<noteq> z \<Longrightarrow> p \<langle>$\<rangle> x \<noteq> z \<Longrightarrow> skip_perm z p x = p \<langle>$\<rangle> x"
+  by (simp add: skip_invariant apply_skip_perm)
+
 lemma skip_perm_notin: "z \<notin> set_perm p \<Longrightarrow> skip_perm z p = p"
 proof -
   assume "z \<notin> set_perm p"
@@ -68,14 +71,6 @@ proof -
   then show ?thesis
     by (simp add: perm.apply_perm_inverse skip_perm_def)
 qed
-
-lemma skip_cycle_notin_cycles_of_perm: "perm_orbit (skip_perm z p) z \<notin> cycles_of_perm p"
-  by (simp add: apply_skip_perm)
-
-lemma perm_skip_image:
-  assumes "(f::'a perm) permutes S"
-  shows "(skip_perm z f) ` (S - {z}) = S - {z}"
-  by (simp add: apply_skip_perm assms permutes_image skip_permutes)
 
 lemma skip_perm_permutes: "(p :: 'a perm) permutes S \<Longrightarrow> skip_perm z p permutes S - {z}"
   by (simp add: apply_skip_perm skip_permutes)
@@ -94,19 +89,9 @@ proof (rule subset_antisym; rule subsetI)
   then show "x \<in> set_perm (skip_perm z p) \<union> {z, p z}"
     by auto
 next
-  fix x assume "x \<in> set_perm (skip_perm z p) \<union> {z, p z}"
-  then consider "x \<in> set_perm (skip_perm z p)" | "x \<in> {z, p z}"
-    by auto
-    then show "x \<in> set_perm p"
-    proof cases
-    case 1
-      then show ?thesis
-        by (metis apply_perm_eq_same_iff(2) apply_skip_perm skip_def)
-    next
-      case 2
-      then show ?thesis
-        using assms(1) by auto
-   qed
+  show "x \<in> set_perm p" if "x \<in> set_perm (skip_perm z p) \<union> {z, p z}" for x
+    by (metis that Un_insert_right apply_perm_eq_same_iff(2) apply_skip_perm
+        assms boolean_algebra_cancel.sup0 insert_iff skip_invariant)
 qed
 
 lemma set_perm_skip_n_cycle:
@@ -144,9 +129,6 @@ proof -
         mk_disjoint_insert perm_of_cycles_not_in set_perm_cycle skip_invariant)
 qed
 
-lemma skip_perm_invariant: "x \<noteq> z \<Longrightarrow> p \<langle>$\<rangle> x \<noteq> z \<Longrightarrow> skip_perm z p x = p \<langle>$\<rangle> x"
-  by (simp add: skip_invariant apply_skip_perm)
-
 lemma skip_perm_cycle_invariant:
   assumes "x \<notin> set_cycle (perm_orbit p z)" "x \<in> set_perm p"
   shows "perm_orbit (skip_perm z p) x = perm_orbit p x"
@@ -170,23 +152,31 @@ proof (rule cycle_eqI; rule; auto simp: conjI apply_cycle_delete)
   show "p \<langle>$\<rangle> z \<noteq> z \<Longrightarrow> z = apply_cycle (perm_orbit (skip_perm z p) (p \<langle>$\<rangle> z)) z"
     by (metis apply_cycle_not_in_set apply_cycle_perm_orbit apply_skip_perm skip_id)
   
-  assume "apply_cycle (perm_orbit p z) x \<noteq> z"  "x \<noteq> z"
+  assume *: "apply_cycle (perm_orbit p z) x \<noteq> z"  "x \<noteq> z"
   then consider "p z = x" 
-    | "p z \<noteq> x \<and> x \<in> set_cycle (perm_orbit p z)" 
     | "x \<notin> set_cycle (perm_orbit p z)"
+    | "p z \<noteq> x \<and> x \<in> set_cycle (perm_orbit p z)" 
     by blast 
   then show "apply_cycle (perm_orbit p z) x = apply_cycle (perm_orbit (skip_perm z p) (p \<langle>$\<rangle> z)) x"
   proof cases
     case 1
     then show ?thesis
-      by (metis \<open>apply_cycle (perm_orbit p z) x \<noteq> z\<close> apply_cycle_perm_orbit apply_cycle_perm_orbit'
+      by (metis *(1) apply_cycle_perm_orbit apply_cycle_perm_orbit'
           apply_perm_in_perm_orbit_iff skip_perm_invariant start_in_perm_orbit)
   next
     case 2
-    then have "apply_cycle (perm_orbit p z) x = p x"
+    then have "apply_cycle (perm_orbit p z) x = x"
+      by (transfer; simp)
+    also have "apply_cycle (perm_orbit (skip_perm z p) (p \<langle>$\<rangle> z)) x = x"
+      by (smt (z3) 2 apply_cycle_not_in_set apply_cycle_perm_orbit apply_perm_in_perm_orbit_iff 
+          apply_skip_perm perm_orbit_eqI perm_orbit_eq_id_cycle_iff skip_def start_in_perm_orbit_iff)
+    ultimately show ?thesis by simp
+next
+  case 3
+  then have "apply_cycle (perm_orbit p z) x = p x"
       by (meson apply_cycle_perm_orbit)
     also {
-      from 2 have "skip_perm z p x = p x"
+      have "skip_perm z p x = p x"
         by (metis \<open>apply_cycle (perm_orbit p z) x \<noteq> z\<close> \<open>x \<noteq> z\<close> skip_invariant 
             apply_skip_perm calculation)
       define n where "n = (LEAST n. (p ^ Suc n) x = p z)"
@@ -194,7 +184,7 @@ proof (rule cycle_eqI; rule; auto simp: conjI apply_cycle_delete)
       proof (simp add: apply_skip_perm)
         assume n_def: "n = (LEAST n. (p * p ^ n) \<langle>$\<rangle> x = p \<langle>$\<rangle> z)"
         have "\<exists>m. (p * p ^ m) x = p z"
-          by (metis 2 apply_perm_power apply_perm_sequence cycles_funpow)
+          by (metis 3 apply_perm_power apply_perm_sequence cycles_funpow)
         then have "(p * p ^ n) x = p z"
           using LeastI n_def by fast
         then have "(p ^ n) x = z"
@@ -204,7 +194,7 @@ proof (rule cycle_eqI; rule; auto simp: conjI apply_cycle_delete)
         { fix l assume "l < n"
           then have "(p ^ l) x \<noteq> p z \<and> (p ^ l) x \<noteq> z"
             apply (safe)
-            using "2" \<open>(p ^ n) \<langle>$\<rangle> x = z\<close> apply_inj_eq_iff apply_perm_sequence
+            using 3 \<open>(p ^ n) \<langle>$\<rangle> x = z\<close> apply_inj_eq_iff apply_perm_sequence
                 dual_order.strict_trans n_def not0_implies_Suc not_less_Least not_less_eq power_Suc
                 power_Suc0_right by (smt (verit, del_insts) \<open>l < n\<close>)+
           from \<open>l < n\<close> have p_eq: "(p ^ l) x = ((skip z p) ^^ l) x"
@@ -224,19 +214,12 @@ proof (rule cycle_eqI; rule; auto simp: conjI apply_cycle_delete)
         then show "(skip z ((\<langle>$\<rangle>) p) ^^ (LEAST n. (p * p ^ n) \<langle>$\<rangle> x = p \<langle>$\<rangle> z)) x = p \<langle>$\<rangle> z"
           by (smt (z3) One_nat_def Suc_pred \<open>(p ^ n) \<langle>$\<rangle> x = z\<close> \<open>0 < n\<close>
               n_def apply_perm_power funpow_simp_l skip_fz)
-        qed
-        then have "apply_cycle (perm_orbit (skip_perm z p) (p \<langle>$\<rangle> z)) x = p x"
-          by (metis "2" \<open>(skip_perm z p) \<langle>$\<rangle> x = p \<langle>$\<rangle> x\<close> apply_cycle_perm_orbit funpow_cycles)
+      qed
+      then have "apply_cycle (perm_orbit (skip_perm z p) (p \<langle>$\<rangle> z)) x = p x"
+        by (metis 3 \<open>(skip_perm z p) \<langle>$\<rangle> x = p \<langle>$\<rangle> x\<close> apply_cycle_perm_orbit funpow_cycles)
     }
     ultimately show ?thesis by simp
   next
-    case 3
-    then have "apply_cycle (perm_orbit p z) x = x"
-      by (transfer; simp)
-    also have "apply_cycle (perm_orbit (skip_perm z p) (p \<langle>$\<rangle> z)) x = x"
-      by (smt (z3) 3 apply_cycle_not_in_set apply_cycle_perm_orbit apply_perm_in_perm_orbit_iff 
-          apply_skip_perm perm_orbit_eqI perm_orbit_eq_id_cycle_iff skip_def start_in_perm_orbit_iff)
-    ultimately show ?thesis by simp
   qed
 qed
 
@@ -333,48 +316,37 @@ proof (rule subset_antisym; rule subsetI)
   ultimately show "x \<in> ?C" by fast
 qed
 
-corollary skip_cycles_card_leq: "card (cycles_of_perm (skip_perm z p)) \<le> card (cycles_of_perm p)"
-  by (smt (verit, del_insts) Diff_insert_absorb Un_insert_right apply_perm_eq_same_iff(2)
- boolean_algebra_cancel.sup0 card_Diff_insert card_eq_0_iff card_insert_if card_mono cycles_skip
- cycles_skip_diff finite_cycles_of_perm insertCI insert_absorb nat.simps(3) apply_skip_perm
- perm_orbit_in_cycles_of_perm_iff perm_orbit_notin_skip_perm remove1_cycle_orbit 
- skip_id subsetI)
-
 section \<open>Permutation domain lemmas\<close>
 context perm_on
 begin
-
-lemma cycle_count_skip_singleton:
-  assumes "p z = z"  "finite S" "z \<in> S"
-  shows "count_cycles_on S p = (count_cycles_on (S - {z}) (skip_perm z p)) + 1"
-proof -
-  have "set_perm p = set_perm (skip_perm z p)"
-    by (metis apply_perm_neq_idI assms(1) skip_perm_notin)
-  moreover have "card (S - set_perm p) = card (S - {z} - set_perm (skip_perm z p)) + 1"
-    by (smt (z3) Diff_eq_empty_iff Diff_insert2 One_nat_def Suc_pred add.right_neutral 
-        add_Suc_right apply_perm_neq_idI assms calculation card_0_eq card_Diff_insert
-        finite_Diff in_mono neq0_conv)
-   moreover have "(skip_perm z p) permutes (S - {z})"
-    by (simp add: permutes_p skip_perm_permutes)
-  ultimately show ?thesis
-    by (metis count_cycles_on_eq_card ab_semigroup_add_class.add_ac(1) apply_perm_neq_idI assms(1) 
-        perm_on.count_cycles_on_eq_card perm_on.intro skip_perm_notin)
-qed
-
 lemma cycle_count_skip:
-  assumes "p z \<noteq> z" "finite S" "z \<in> S"
-  shows "count_cycles_on S p = count_cycles_on (S - {z}) (skip_perm z p)"
-proof (cases "p (p z) = z")
-  case True
+  assumes "finite S" "z \<in> S"
+  shows "count_cycles_on S p = count_cycles_on (S - {z}) (skip_perm z p) + (if p z = z then 1 else 0)"
+proof -
+  consider "p z = z" | "p z \<noteq> z \<and> p (p z) = z" | "p (p z) \<noteq> z" by blast
+then show ?thesis
+proof cases
+  case 1
+  have "set_perm p = set_perm (skip_perm z p)"
+    by (metis apply_perm_neq_idI 1 skip_perm_notin)
+  moreover have "card (S - set_perm p) = Suc (card (S - {z} - set_perm (skip_perm z p)))"
+    by (smt (z3) 1 Diff_eq_empty_iff Diff_insert2 One_nat_def Suc_pred add_Suc_right 
+        add_diff_cancel_right' apply_perm_neq_idI assms calculation card_Diff_insert card_gt_0_iff 
+        finite_Diff subsetD zero_less_Suc)
+  ultimately show ?thesis
+    by (smt (z3) "1" Nat.add_0_right add_Suc_right apply_perm_neq_idI count_cycles_on_def 
+        perm_type_on_def size_replicate_mset One_nat_def size_union skip_perm_notin)
+next
+  case 2
   then have pz_id: "skip_perm z p (p z) = p z"
     by (simp add: apply_skip_perm)
   then have skip_z: "delete_cycle z (perm_orbit p z) = id_cycle"
     by (simp add: remove1_cycle_orbit)
   { have "cycles_of_perm p = cycles_of_perm (skip_perm z p) \<union> {perm_orbit p z}
                               - {delete_cycle z (perm_orbit p z)}"
-      by (meson assms(1) cycles_skip not_in_set_perm)
+      by (meson "2" apply_perm_eq_idI cycles_skip)
     then have "cycles_of_perm p = cycles_of_perm (skip_perm z p) \<union> {perm_orbit p z}"
-        by (simp add: skip_z assms(1))
+        by (simp add: skip_z 2)
     moreover have "perm_orbit p z \<notin> cycles_of_perm (skip_perm z p)"
         by (simp add: perm_orbit_notin_skip_perm)
     ultimately have "card (cycles_of_perm p) = card (cycles_of_perm (skip_perm z p)) + 1"
@@ -382,37 +354,41 @@ proof (cases "p (p z) = z")
   }
   moreover {
     have "set_perm p = set_perm (skip_perm z p) \<union> {z, p z}"
-      by (meson True assms(1) set_perm_skip_2_cycle)
+      by (meson 2 assms(1) set_perm_skip_2_cycle)
     also have "z \<notin> set_perm (skip_perm z p)"
       by (simp add: apply_skip_perm in_set_perm)
     moreover have "p z \<notin> set_perm (skip_perm z p)"
-      using True \<open>(skip_perm z p) (p z) = p z\<close> by blast
+      using 2 \<open>(skip_perm z p) (p z) = p z\<close> by blast
     ultimately have "card (S - set_perm p) = card (S - {z} - set_perm (skip_perm z p)) - 1"
       by (smt (z3) Diff_iff Diff_insert2 Diff_insert_absorb Permutations.permutes_not_in 
-          Un_insert_right apply_perm_eq_same_iff(1) apply_set_perm assms(1) assms(2)
+          Un_insert_right apply_perm_eq_same_iff(1) apply_set_perm assms
           boolean_algebra_cancel.sup0 card_Diff_insert permutes_p singletonD)
     }
   ultimately show ?thesis
     apply (simp add: perm_on.count_cycles_on_eq_card perm_on.intro skip_perm_permutes permutes_p)
-    by (metis DiffI Suc_pred pz_id skip_z apply_perm_in_iff apply_perm_neq_idI assms card_gt_0_iff
-      finite_Diff insertE remove1_cycle_orbit set_cycle_id set_perm_subset start_in_perm_orbit_iff)
+    by (smt (verit, ccfv_threshold) "2" Diff_eq_empty_iff Diff_insert_absorb Suc_pred 
+        apply_perm_in_iff apply_perm_neq_idI assms card_gt_0_iff finite_Diff
+        in_mono insertE mk_disjoint_insert pz_id set_perm_subset)
 next
-  case False
+  case 3
   { then have "set_perm p = set_perm (skip_perm z p) \<union> {z}"
       by (metis set_perm_skip_n_cycle)
     also have "z \<notin> set_perm (skip_perm z p)"
       by (simp add: apply_skip_perm in_set_perm)
-    ultimately have "card (S - set_perm p) = card (S - {z} - set_perm (skip_perm z p))"
+    ultimately have "S - set_perm p = S - {z} - set_perm (skip_perm z p)"
       by (metis Diff_insert2 Un_insert_right boolean_algebra_cancel.sup0)
   }
   also have "card (cycles_of_perm p) = card (cycles_of_perm (skip_perm z p))"
-    by (smt (verit, ccfv_threshold) Diff_insert_absorb False Un_insert_right apply_set_perm 
+    by (smt (verit, ccfv_threshold) Diff_insert_absorb 3 Un_insert_right apply_set_perm 
         boolean_algebra_cancel.sup0 card.infinite card_0_eq card_Diff_insert card_insert_le 
         cycles_skip finite_cycles_of_perm insert_absorb insert_iff le_zero_eq
         perm_orbit_in_cycles_of_perm perm_orbit_notin_skip_perm remove1_cycle_orbit
         set_perm_skip_n_cycle)
   ultimately show ?thesis
-    by (simp add: perm_on.count_cycles_on_eq_card perm_on.intro permutes_p skip_perm_permutes)
+    by (smt (z3) 3 add.right_neutral perm_on.count_cycles_on_eq_card 
+        perm_on.intro permutes_p skip_perm_permutes)
 qed
+qed
+
 end
 end
