@@ -2,9 +2,11 @@ theory Walkup
   imports Hypermap Skip
 begin
 
+text \<open>This theory mirrors the walkup.v theory from the four-colour theorem proof\<close>
+
 section \<open>Skip edge\<close>
-text \<open>Special case for triangular identity - either merge two cycles or split a cycle
-         - If z and node z are on different e cycles walkupE merges them
+text \<open>Special case of skip for triangular identity - either merge two cycles or split a cycle
+         - If z and node H z are on different edge cycles, walkupE merges them
          - Otherwise, walkupE splits this cycle\<close>
 
 definition skip_edge where
@@ -19,12 +21,13 @@ lemma skip_edge_id [simp]: "skip_edge z h z = z"
 lemma skip_edge_noteq_z: "x \<noteq> z \<Longrightarrow> skip_edge z H x \<noteq> z"
   by (metis apply_inj_eq_iff skip_edge_def)
 
+text \<open>Skip_edge is only different from edge if it is acting on z, n f z or n^{-1} z\<close>
 lemma (in hypermap) skip_edge_base:
   assumes "x \<noteq> z" "x \<noteq> node H (face H z)" "x \<noteq> node H z"
   shows "edge H x = skip_edge z H x"
   by (metis assms nodeK skip_edge_def)
 
-context hypermap 
+context hypermap
 begin
 lemma skip_edge_Perm: "(\<langle>$\<rangle>) (Perm (skip_edge z H)) = skip_edge z H"
 proof
@@ -87,6 +90,8 @@ end
 
 section \<open>WalkupE\<close>
 
+text \<open>Here we define the Walkup_E transformation on hypermaps, along with some basic properties\<close>
+
 definition walkupE :: "'a pre_hypermap \<Rightarrow> 'a \<Rightarrow> 'a pre_hypermap" where
 "walkupE h z = 
   \<lparr>darts = darts h - {z},
@@ -130,6 +135,9 @@ lemma walkup_face: "face H' = skip_perm z (face H)"
 
 lemma walkup_darts_subset: "darts H' \<subseteq> darts H"
   unfolding H'_def walkupE_def by simp
+
+lemma card_darts_walkup: "card (darts H') = card (darts H) - 1"
+  by (simp add: H'_def finite_darts walkupE_def z_dart)
 end
 (*
 locale not_degenerate_walkup = walkup +
@@ -158,8 +166,6 @@ end
 
 context walkup 
 begin
-lemma card_darts_walkup: "card (darts H') = card (darts H) - 1"
-  by (simp add: H'_def finite_darts walkupE_def z_dart)
 
 text \<open>(From fourcolour.walkup.v)
  cross_edge z <=> z and node z are on the same edge cycle. This edge cycle 
@@ -474,7 +480,6 @@ proof -
     by (metis H'_def \<open>hd p = (edge H) \<langle>$\<rangle> z\<close> hypermap.wf_cedge hypermap_walkupE
         wf_digraph.reachable_vpath_conv wf_digraph_wp_iff)
 qed
-
 
 definition "disconnected \<equiv> card (pre_digraph.sccs z_comp) > 1"
 
